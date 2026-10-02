@@ -31,7 +31,7 @@ PIPELINE = [
     ("Modèle IA", "U-Net entraîné sur 6 vidéos, évalué sur 2 vidéos jamais vues"),
     ("Inférence", "59 830 frames segmentées, mesures géométriques par frame"),
     ("Signaux & KPI", "étalonnage px → mm, détection ON/OFF, vitesse, stabilité, alarmes"),
-    ("Analyse DoE", "surfaces de réponse quadratiques, effets, cartes de contrôle"),
+    ("Suivi & analyses", "verdict par soudure, surfaces de réponse, effets, cartes de contrôle"),
 ]
 
 SIGNALS = [

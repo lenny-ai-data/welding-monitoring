@@ -1,24 +1,105 @@
-/* Monitoring live : synchronisation vidéo <-> signaux, entièrement côté client.
+/* Monitoring process : lecteur vidéo, synchronisation vidéo <-> signaux, entièrement côté client.
  *
  * La vidéo web contient une frame par frame caméra (30 im/s) : l'index de frame procédé est
  * floor(currentTime * 30). À chaque tick (100 ms), on révèle les signaux jusqu'à cet index ;
- * si rien n'a changé (pause), on ne renvoie rien pour éviter tout rendu inutile.
+ * si rien n'a changé (pause), on ne renvoie rien pour éviter tout rendu inutile. La timeline du
+ * lecteur (progression, tête de lecture, temps) est animée à chaque image par requestAnimationFrame.
  */
 (function () {
   "use strict";
 
-  const state = { key: null, run: null, videoRun: null, idx: -1, advancing: false, resume: null, rate: 1 };
-  const N_OUTPUTS = 17;
+  const state = { key: null, run: null, videoRun: null, idx: -1, advancing: false, resume: null, rate: 1, p: null };
+  const KPIS = ["power", "speed", "plasma", "stab", "spatter"]; // même ordre que KPIS (tabs/process.py)
+  const N_OUTPUTS = 4 + 1 + 3 + 3 * KPIS.length + 3;
+  const HOLD_MS = 3; // une alarme reste affichée 3 ms de procédé
   const nf = (v, d) =>
     v === null || v === undefined || Number.isNaN(v)
       ? "—"
       : Number(v).toLocaleString("fr-FR", { minimumFractionDigits: d, maximumFractionDigits: d });
 
   const el = (type, props) => ({ type, namespace: "dash_html_components", props });
+  const video = () => document.getElementById("live-video");
+  const noUpdates = () => Array(N_OUTPUTS).fill(window.dash_clientside.no_update);
 
-  function video() {
-    return document.getElementById("live-video");
+  // Couleur d'anneau : violet, puis doré entre 60 et 100 % de la limite, rouge au-delà d'un seuil d'alarme.
+  function hex(h) {
+    return [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
   }
+  function mix(a, b, k) {
+    const A = hex(a);
+    const B = hex(b);
+    return "rgb(" + A.map((v, i) => Math.round(v + (B[i] - v) * k)).join(", ") + ")";
+  }
+  function ringColor(c, r, alarm) {
+    if (alarm) return c.alarm;
+    return mix(c.ring, c.gold, Math.min(Math.max((r - 0.6) / 0.4, 0), 1));
+  }
+  const ring = (r, color) => ({ "--p": Math.round(Math.min(Math.max(r, 0), 1) * 1000) / 10, "--c": color });
+
+  // ---------------------------------------------------------------------------------------------
+  // Lecteur : lecture / pause, recherche dans la timeline (souris, tactile, clavier).
+  function togglePlay() {
+    const v = video();
+    if (!v) return;
+    if (v.paused || v.ended) {
+      if (v.ended) v.currentTime = 0;
+      v.play().catch(() => {});
+    } else {
+      v.pause();
+    }
+  }
+
+  function seekTo(fraction) {
+    const v = video();
+    if (!v || !v.duration) return;
+    v.currentTime = Math.min(Math.max(fraction, 0), 0.9999) * v.duration;
+  }
+
+  let dragging = false;
+  function seekFromPointer(e) {
+    const track = document.getElementById("vp-track");
+    if (!track) return;
+    const box = track.getBoundingClientRect();
+    seekTo((e.clientX - box.left) / box.width);
+  }
+
+  // Vitesse de lecture : ½× → 1× → 2× (bouton unique, compact).
+  const RATES = [0.5, 1, 2];
+  function cycleRate(btn) {
+    state.rate = RATES[(RATES.indexOf(state.rate) + 1) % RATES.length];
+    const v = video();
+    if (v) v.playbackRate = state.rate;
+    const label = (state.rate === 0.5 ? "½" : String(state.rate)) + "×";
+    btn.textContent = label;
+    btn.setAttribute("aria-label", "Vitesse de lecture : " + label);
+  }
+
+  document.addEventListener("click", (e) => {
+    if (e.target.closest("#vp-play") || e.target.closest("#live-video")) togglePlay();
+    const rate = e.target.closest("#vp-rate");
+    if (rate) cycleRate(rate);
+  });
+  document.addEventListener("pointerdown", (e) => {
+    if (!e.target.closest("#vp-track")) return;
+    dragging = true;
+    seekFromPointer(e);
+  });
+  document.addEventListener("pointermove", (e) => dragging && seekFromPointer(e));
+  document.addEventListener("pointerup", () => (dragging = false));
+  document.addEventListener("keydown", (e) => {
+    if (!e.target || e.target.id !== "vp-track") return;
+    const v = video();
+    if (!v || !v.duration) return;
+    const f = v.currentTime / v.duration;
+    const moves = { ArrowLeft: f - 0.02, ArrowRight: f + 0.02, Home: 0, End: 1 };
+    if (e.key in moves) {
+      seekTo(moves[e.key]);
+      e.preventDefault();
+    } else if (e.key === " " || e.key === "Enter") {
+      togglePlay();
+      e.preventDefault();
+    }
+  });
 
   // Reprise de la position après changement de source (vidéo brute <-> masques IA) ou de run.
   document.addEventListener(
@@ -36,99 +117,154 @@
     true
   );
 
-  function noUpdates() {
-    return Array(N_OUTPUTS).fill(window.dash_clientside.no_update);
+  // Timeline animée à chaque image (éléments sans sortie Dash : aucun conflit de rendu).
+  function animate() {
+    const v = video();
+    const track = document.getElementById("vp-track");
+    if (v && track) {
+      const f = v.duration ? v.currentTime / v.duration : 0;
+      const pct = (100 * Math.min(f, 1)).toFixed(2) + "%";
+      const prog = document.getElementById("vp-progress");
+      const head = document.getElementById("vp-head");
+      const time = document.getElementById("vp-time");
+      const play = document.getElementById("vp-play");
+      if (prog) prog.style.width = pct;
+      if (head) head.style.left = pct;
+      track.setAttribute("aria-valuenow", Math.round(100 * f));
+      if (time && state.p) {
+        const p = state.p;
+        const idx = Math.max(0, Math.min(p.n - 1, Math.floor(v.currentTime * p.playback_fps + 1e-3)));
+        const txt = nf(p.ts.t_ms[idx], 1) + " / " + nf(p.duration, 1) + " ms";
+        if (time.textContent !== txt) time.textContent = txt;
+      }
+      if (play) play.classList.toggle("is-playing", !v.paused && !v.ended);
+    }
+    window.requestAnimationFrame(animate);
+  }
+  window.requestAnimationFrame(animate);
+
+  // ---------------------------------------------------------------------------------------------
+  // Statut, KPI, courbes.
+  function activeAlarms(p, idx) {
+    const hold = Math.round((p.fps * HOLD_MS) / 1000);
+    return p.events.filter((e) => e.start <= idx && idx <= e.end + hold && !["on", "off"].includes(e.type));
   }
 
-  function statusAt(p, idx) {
+  function statusAt(p, idx, alarms) {
+    const on = p.events.find((e) => e.type === "on");
     if (!p.ts.on[idx]) {
-      return { cls: "status-off", icon: "○", text: "Laser OFF", sub: "laser éteint" };
+      const before = !on || idx < on.start;
+      return ["status-card is-standby", "En veille", before ? "En attente d'allumage" : "Soudure terminée"];
     }
-    const hold = Math.round(p.fps * 0.003); // une alarme reste affichée 3 ms
-    const active = p.events.filter(
-      (e) => e.start <= idx && idx <= e.end + hold && !["on", "off"].includes(e.type)
-    );
-    if (active.length) {
-      const e = active[active.length - 1];
-      const serious = e.type !== "spatter_burst";
-      return {
-        cls: serious ? "status-serious" : "status-warning",
-        icon: "▲",
-        text: "Alarme",
-        sub: e.label,
-      };
-    }
-    return { cls: "status-good", icon: "●", text: "Nominal", sub: "dans les limites" };
+    if (alarms.length) return ["status-card is-alarm", "Alarme", alarms[alarms.length - 1].short];
+    return ["status-card is-firing", "Tir en cours", "Aucune alarme"];
   }
 
-  function figure(p, idx) {
+  function kpis(p, idx, alarms) {
     const ts = p.ts;
+    const c = p.colors;
+    const L = p.limits;
+    const on = Boolean(ts.on[idx]);
+    const speed = ts.speed_mm_s[idx];
+    const dev = speed != null ? (100 * (speed - p.setpoint.speed)) / p.setpoint.speed : null;
+    const plasma = on ? ts.plasma_mm2[idx] : 0;
+    const cv = ts.plasma_cv[idx];
+    const n = ts.spatter_n[idx];
+    const speedAlarm = alarms.some((e) => e.type === "speed_deviation");
+
+    const rSpeed = dev != null ? Math.abs(dev) / L.speed_warn_pct : 0;
+    const rPlasma = L.plasma ? plasma / L.plasma : 0;
+    const rStab = cv != null ? cv / L.stab : 0;
+    const rSpatter = n / L.burst;
+    return [
+      [on ? nf(p.setpoint.power, 0) : "0", on ? "consigne" : "laser coupé", ring(on ? 1 : 0, c.ring)],
+      [
+        speed != null ? nf(speed, 0) : "—",
+        dev != null ? (dev >= 0 ? "+" : "−") + nf(Math.abs(dev), 0) + " % / consigne" : on ? "mesure en cours" : "à l'arrêt",
+        ring(rSpeed, ringColor(c, rSpeed, speedAlarm)),
+      ],
+      [
+        nf(plasma, 1),
+        on && L.plasma ? Math.round(100 * rPlasma) + " % du seuil" : "éteint",
+        ring(rPlasma, ringColor(c, rPlasma, rPlasma >= 1)),
+      ],
+      [cv != null ? nf(100 * cv, 0) : "—", "sur 5 ms", ring(rStab, ringColor(c, rStab, false))],
+      [String(n), n > 1 ? "visibles" : "visible", ring(rSpatter, ringColor(c, rSpatter, rSpatter >= 1))],
+    ];
+  }
+
+  function figures(p, idx) {
+    const ts = p.ts;
+    const c = p.colors;
     const end = idx + 1;
     const x = ts.t_ms.slice(0, end);
-    const c = p.colors;
-    const line = (color, width, extra) => Object.assign({ color, width }, extra || {});
-    const traces = [
-      {
-        x, y: ts.power_cmd_w.slice(0, end), yaxis: "y", type: "scatter", mode: "lines",
-        name: "Puissance (consigne)", line: line(c.setpoint, 2, { shape: "hv" }),
-        fill: "tozeroy", fillcolor: "rgba(140,134,152,0.10)", hovertemplate: "%{y:.0f} W",
-      },
-      {
-        x, y: ts.feed_cmd_mm_s.slice(0, end), yaxis: "y2", type: "scatter", mode: "lines",
-        name: "Vitesse (consigne)", line: line(c.setpoint, 1.5, { shape: "hv", dash: "dash" }),
-        hovertemplate: "%{y:.0f} mm/s",
-      },
-      {
-        x, y: ts.speed_mm_s.slice(0, end), yaxis: "y2", type: "scatter", mode: "lines",
-        name: "Vitesse (mesurée)", line: line(c.weld, 2), connectgaps: false,
-        hovertemplate: "%{y:.0f} mm/s",
-      },
-      {
-        x, y: ts.plasma_mm2.slice(0, end), yaxis: "y3", type: "scatter", mode: "lines",
-        name: "Plasma (frame)", line: line(c.plasma, 1), opacity: 0.4, hovertemplate: "%{y:.2f} mm²",
-      },
-      {
-        x, y: ts.plasma_smooth_mm2.slice(0, end), yaxis: "y3", type: "scatter", mode: "lines",
-        name: "Plasma (moy. 2 ms)", line: line(c.plasma, 2.2), hovertemplate: "%{y:.2f} mm² (moy.)",
-      },
-      {
-        x, y: ts.spatter_n.slice(0, end), yaxis: "y4", type: "scatter", mode: "lines",
-        name: "Projections", line: line(c.spatter, 1.2, { shape: "hv" }), fill: "tozeroy",
-        fillcolor: c.spatter + "33", hovertemplate: "%{y} visibles",
-      },
-      {
-        x, y: ts.weld_length_mm.slice(0, end), yaxis: "y5", type: "scatter", mode: "lines",
-        name: "Cordon", line: line(c.weld, 2), hovertemplate: "%{y:.1f} mm",
-      },
-    ];
-
-    // Marqueurs d'alarme (statut + forme, jamais la couleur seule).
+    const cut = (s) => s.slice(0, end);
     const past = p.events.filter((e) => e.start <= idx);
-    const marker = (type, axis, series, color, symbol, name) => {
-      const ev = past.filter((e) => e.type === type);
-      if (!ev.length) return null;
-      return {
-        x: ev.map((e) => ts.t_ms[e.start]), y: ev.map((e) => series[e.start]), yaxis: axis,
-        type: "scatter", mode: "markers", name,
-        marker: { color, size: 9, symbol, line: { width: 1.5, color: "rgba(0,0,0,0.35)" } },
-        hovertemplate: name + "<extra></extra>",
-      };
-    };
-    [
-      marker("plasma_spike", "y3", ts.plasma_mm2, c.serious, "triangle-up", "Pic de plasma"),
-      marker("spatter_burst", "y4", ts.spatter_n, c.warning, "diamond", "Rafale de projections"),
-      marker("speed_deviation", "y2", ts.speed_mm_s, c.serious, "triangle-down", "Écart de vitesse"),
-    ].forEach((m) => m && traces.push(m));
+    const tNow = ts.t_ms[idx];
 
+    // Marqueurs d'événement : symbole sur la courbe + trait vertical (forme + couleur, jamais la couleur seule).
+    function marks(type, series, color, symbol, name) {
+      const ev = past.filter((e) => e.type === type);
+      const shapes = ev.map((e) => ({
+        type: "line", xref: "x", yref: "paper", x0: ts.t_ms[e.start], x1: ts.t_ms[e.start], y0: 0, y1: 1,
+        layer: "below", line: { color, width: 1, dash: "dot" },
+      }));
+      const trace = ev.length
+        ? {
+            x: ev.map((e) => ts.t_ms[e.start]), y: ev.map((e) => series[e.start]), type: "scatter", mode: "markers",
+            name, marker: { color, size: 10, symbol, line: { width: 1.5, color: c.surface } },
+            hovertemplate: name + "<extra></extra>",
+          }
+        : null;
+      return { shapes, trace };
+    }
     const cursor = {
-      type: "line", xref: "x", yref: "paper", x0: ts.t_ms[idx], x1: ts.t_ms[idx], y0: 0, y1: 1,
-      line: { color: c.muted, width: 1 },
+      type: "line", xref: "x", yref: "paper", x0: tNow, x1: tNow, y0: 0, y1: 1,
+      line: { color: c.cursor, width: 1 }, opacity: 0.45,
     };
-    const layout = Object.assign({}, p.layout, { shapes: p.layout.shapes.concat([cursor]) });
-    return { data: traces, layout };
+    function fig(key, traces, m) {
+      const lay = p.layouts[key];
+      const extra = m ? m.shapes : [];
+      return {
+        data: m && m.trace ? traces.concat([m.trace]) : traces,
+        layout: Object.assign({}, lay, { shapes: lay.shapes.concat(extra, [cursor]) }),
+      };
+    }
+    const line = (y, name, fmt, extra) =>
+      Object.assign(
+        { x, y, type: "scatter", mode: "lines", name, line: { color: c.line, width: 2 }, hovertemplate: fmt },
+        extra || {}
+      );
+
+    return [
+      fig(
+        "plasma",
+        [
+          line(cut(ts.plasma_mm2), "image", "%{y:.1f} mm²", { line: { color: c.line_raw, width: 1 } }),
+          line(cut(ts.plasma_smooth_mm2), "moyenne 2 ms", "%{y:.1f} mm² (moy.)"),
+        ],
+        marks("plasma_spike", ts.plasma_mm2, c.alarm, "triangle-up", "Pic de plasma")
+      ),
+      fig(
+        "speed",
+        [line(cut(ts.speed_mm_s), "mesurée", "%{y:.0f} mm/s", { connectgaps: false })],
+        marks("speed_deviation", ts.speed_mm_s, c.alarm, "triangle-down", "Écart de vitesse")
+      ),
+      fig(
+        "spatter",
+        [
+          line(cut(ts.spatter_n), "projections", "%{y} visibles", {
+            line: { color: c.line, width: 1.4, shape: "hv" }, fill: "tozeroy", fillcolor: c.fill,
+          }),
+        ],
+        marks("spatter_burst", ts.spatter_n, c.gold, "diamond", "Rafale de projections")
+      ),
+      fig("weld", [line(cut(ts.weld_length_mm), "cordon", "%{y:.1f} mm", { fill: "tozeroy", fillcolor: c.fill })]),
+    ];
   }
 
   function eventItems(p, idx) {
+    const icons = { on: "◉", off: "○", plasma_spike: "▲", spatter_burst: "◆", speed_deviation: "▼" };
     return p.events
       .filter((e) => e.start <= idx)
       .reverse()
@@ -138,7 +274,7 @@
           className: "event event-" + e.type,
           children: [
             el("Span", { className: "event-time", children: nf(e.t_ms, 2) + " ms" }),
-            el("Span", { className: "event-icon", children: e.type === "on" ? "◉" : e.type === "off" ? "○" : "▲" }),
+            el("Span", { className: "event-icon", children: icons[e.type] || "•" }),
             el("Span", { className: "event-label", children: e.label }),
           ],
         })
@@ -152,34 +288,49 @@
         const v = video();
         const sameRun = state.videoRun === p.run_id;
         state.videoRun = p.run_id;
+        const autoplay = Boolean(window.weldAutoplay);
+        window.weldAutoplay = false;
         if (v) {
           state.resume = sameRun
             ? { t: v.currentTime, play: !v.paused }
-            : { t: 0, play: Boolean(prodMode) || (v.currentTime > 0 && !v.paused) };
+            : { t: 0, play: Boolean(prodMode) || autoplay || (v.currentTime > 0 && !v.paused) };
         }
-        const suffix = source === "ia" ? "_ia" : "";
+        const suffix = source === "raw" ? "" : "_ia";
         return ["/media/videos/" + p.run_id + suffix + ".mp4", "/media/posters/" + p.run_id + ".jpg"];
       },
 
-      setRate: function (rate) {
-        state.rate = parseFloat(rate) || 1;
-        const v = video();
-        if (v) v.playbackRate = state.rate;
-        return window.dash_clientside.no_update;
+      toggleMasks: function (_n, source) {
+        const next = source === "raw" ? "ia" : "raw";
+        const on = next === "ia";
+        return [next, on ? "true" : "false", "mask-toggle" + (on ? "" : " is-off"), "mask-legend" + (on ? "" : " is-hidden")];
+      },
+
+      // Repères de la timeline : phase laser ON et événements, positionnés en part de la vidéo.
+      marks: function (p) {
+        if (!p) return [[], {}];
+        const pos = (i) => ((100 * i) / p.n).toFixed(2) + "%";
+        const on = p.events.find((e) => e.type === "on");
+        const off = p.events.find((e) => e.type === "off");
+        const style = on ? { left: pos(on.start), width: ((100 * ((off ? off.start : p.n) - on.start)) / p.n).toFixed(2) + "%" } : { display: "none" };
+        const marks = p.events
+          .filter((e) => !["on", "off"].includes(e.type))
+          .map((e) => el("Span", { className: "vp-mark m-" + e.type, style: { left: pos(e.start) }, title: e.short + " · " + nf(e.t_ms, 1) + " ms" }));
+        return [marks, style];
       },
 
       tick: function (_n, p, prodMode) {
         const v = video();
         if (!p || !v) return noUpdates();
+        state.p = p;
         const ctx = window.dash_clientside.callback_context;
         // Clé stable du payload (run + thème) : évite de redessiner quand rien n'a changé.
-        const key = p.run_id + "|" + p.layout.font.color;
+        const key = p.run_id + "|" + p.colors.line;
         const newPayload = state.key !== key;
         if (state.run !== p.run_id) state.advancing = false;
         state.key = key;
         state.run = p.run_id;
 
-        // Mode ligne de production : à la fin de la vidéo, on passe au run suivant.
+        // Enchaîner : à la fin de la vidéo, on passe à la soudure suivante.
         if (prodMode && v.ended && !state.advancing) {
           state.advancing = true;
           const out = noUpdates();
@@ -192,39 +343,20 @@
         if (idx === state.idx && !newPayload && !triggeredByData) return noUpdates();
         state.idx = idx;
 
-        const ts = p.ts;
-        const st = statusAt(p, idx);
-        const on = Boolean(ts.on[idx]);
-        const speed = ts.speed_mm_s[idx];
-        const dev = speed != null ? (100 * (speed - p.setpoint.speed)) / p.setpoint.speed : null;
-        const cv = ts.plasma_cv[idx];
-        const bursts = p.events.filter((e) => e.type === "spatter_burst" && e.start <= idx).length;
+        const alarms = activeAlarms(p, idx);
         const shown = p.events.filter((e) => e.start <= idx).length;
-
         const hud = [
-          el("Span", { className: "hud-live", children: "● REPLAY" }),
-          el("Span", { children: "t = " + nf(ts.t_ms[idx], 2) + " ms" }),
-          el("Span", { children: "frame " + (idx + 1) + " / " + p.n }),
-          el("Span", { children: "ralenti ×1/" + p.slowmo + " · " + nf(p.fps, 0) + " im/s" }),
+          el("Span", { children: "t = " + nf(p.ts.t_ms[idx], 2) + " ms" }),
+          el("Span", { children: "image " + (idx + 1) + " / " + p.n }),
+          el("Span", { children: "×1/" + p.slowmo }),
         ];
-
         return [
-          figure(p, idx),
+          ...figures(p, idx),
           hud,
-          on ? nf(p.setpoint.power, 0) + " W" : "0 W",
-          on ? "laser ON" : "laser OFF",
-          speed != null ? nf(speed, 0) + " mm/s" : "—",
-          "consigne " + nf(p.setpoint.speed, 0) + (dev != null ? " · " + (dev >= 0 ? "+" : "") + nf(dev, 0) + " %" : ""),
-          on ? nf(ts.plasma_mm2[idx], 2) + " mm²" : "—",
-          p.threshold ? "seuil " + nf(p.threshold, 1) + " mm²" : "",
-          cv != null ? nf(100 * cv, 0) + " %" : "—",
-          "CV sur 5 ms",
-          String(ts.spatter_n[idx]),
-          bursts + (bursts > 1 ? " rafales" : " rafale"),
-          el("Span", { className: "status " + st.cls, children: st.icon + " " + st.text }),
-          st.sub,
+          ...statusAt(p, idx, alarms),
+          ...kpis(p, idx, alarms).flat(),
           eventItems(p, idx),
-          shown + " / " + p.events.length + " événements",
+          shown + " / " + p.events.length,
           window.dash_clientside.no_update,
         ];
       },

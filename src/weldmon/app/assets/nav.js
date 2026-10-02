@@ -3,7 +3,8 @@
 (function () {
   "use strict";
 
-  const KEYS = ["live", "seg", "doe", "about"]; // même ordre que SECTIONS (app/__init__.py)
+  const KEYS = ["suivi", "process", "seg", "analyses", "about"]; // même ordre que SECTIONS (app/__init__.py)
+  const DEFAULT = "suivi"; // = DEFAULT_SECTION
   const WIDTH = { expanded: 240, collapsed: 72 }; // = NAV_WIDTH
   const STORAGE_KEY = "weldmon-nav-collapsed";
   let current = null;
@@ -11,7 +12,7 @@
 
   function fromHash() {
     const key = window.location.hash.replace("#", "");
-    return KEYS.includes(key) ? key : "live";
+    return KEYS.includes(key) ? key : DEFAULT;
   }
 
   function readCollapsed() {
@@ -30,9 +31,29 @@
     }
   }
 
+  function go(key) {
+    current = key;
+    if (window.location.hash !== "#" + current) {
+      window.history.replaceState(null, "", "#" + current);
+    }
+    window.scrollTo({ top: 0 });
+  }
+
+  // Soudure ouverte depuis le suivi : si elle est déjà chargée dans le lecteur, on la relance ici ;
+  // sinon le chargement du run s'en charge (drapeau window.weldAutoplay).
+  function playIfLoaded(run) {
+    const v = document.getElementById("live-video");
+    if (!v || !run || !window.weldAutoplay) return;
+    if ((v.getAttribute("src") || "").indexOf("/" + run + "_") !== -1 || (v.getAttribute("src") || "").endsWith("/" + run + ".mp4")) {
+      window.weldAutoplay = false;
+      if (v.ended) v.currentTime = 0;
+      v.play().catch(() => {});
+    }
+  }
+
   window.dash_clientside = Object.assign({}, window.dash_clientside, {
     nav: {
-      route: function (_clicks, burgerOpened, _collapseClicks, navbar) {
+      route: function (_clicks, burgerOpened, _collapseClicks, goto, _crumb, navbar) {
         const ctx = window.dash_clientside.callback_context;
         const trig = ctx && ctx.triggered_id;
         let opened = Boolean(burgerOpened);
@@ -44,16 +65,17 @@
           collapsed = !collapsed;
           saveCollapsed(collapsed);
         } else if (trig && typeof trig === "object" && trig.type === "nav") {
-          current = trig.index;
+          go(trig.index);
           opened = false; // sur mobile, le menu se referme après un choix
-          if (window.location.hash !== "#" + current) {
-            window.history.replaceState(null, "", "#" + current);
-          }
-          window.scrollTo({ top: 0 });
+        } else if (trig === "goto" && goto && KEYS.includes(goto.section)) {
+          go(goto.section);
+          playIfLoaded(goto.run);
+        } else if (trig === "crumb-suivi") {
+          go("suivi");
         }
 
         // Quitter le monitoring met la vidéo en pause (pas de lecture invisible en arrière-plan).
-        if (current !== "live") {
+        if (current !== "process") {
           const v = document.getElementById("live-video");
           if (v && !v.paused) v.pause();
         }
