@@ -12,19 +12,24 @@ dependencies = [
 ]
 
 [dependency-groups]
-pipeline = [
+# Traitements de données et signaux (légers : utilisables en CI).
+analysis = [
     "numpy>=2.0",
     "pandas>=2.2",
     "pyarrow>=17.0",
     "openpyxl>=3.1",
     "scipy>=1.14",
     "opencv-python-headless>=4.10",
+    "tqdm>=4.66",
+]
+# Entraînement / inférence du modèle de segmentation (GPU).
+ml = [
     "torch>=2.5",
     "torchvision>=0.20",
     "segmentation-models-pytorch>=0.4",
     "timm>=1.0",
-    "tqdm>=4.66",
 ]
+pipeline = [{ include-group = "analysis" }, { include-group = "ml" }]
 dev = [
     "pytest>=8.3",
     "ruff>=0.8",

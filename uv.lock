@@ -1141,9 +1141,24 @@ dependencies = [
 ]
 
 [package.dev-dependencies]
+analysis = [
+    { name = "numpy" },
+    { name = "opencv-python-headless" },
+    { name = "openpyxl" },
+    { name = "pandas" },
+    { name = "pyarrow" },
+    { name = "scipy" },
+    { name = "tqdm" },
+]
 dev = [
     { name = "pytest" },
     { name = "ruff" },
+]
+ml = [
+    { name = "segmentation-models-pytorch" },
+    { name = "timm" },
+    { name = "torch" },
+    { name = "torchvision" },
 ]
 pipeline = [
     { name = "numpy" },
@@ -1168,9 +1183,24 @@ requires-dist = [
 ]
 
 [package.metadata.requires-dev]
+analysis = [
+    { name = "numpy", specifier = ">=2.0" },
+    { name = "opencv-python-headless", specifier = ">=4.10" },
+    { name = "openpyxl", specifier = ">=3.1" },
+    { name = "pandas", specifier = ">=2.2" },
+    { name = "pyarrow", specifier = ">=17.0" },
+    { name = "scipy", specifier = ">=1.14" },
+    { name = "tqdm", specifier = ">=4.66" },
+]
 dev = [
     { name = "pytest", specifier = ">=8.3" },
     { name = "ruff", specifier = ">=0.8" },
+]
+ml = [
+    { name = "segmentation-models-pytorch", specifier = ">=0.4" },
+    { name = "timm", specifier = ">=1.0" },
+    { name = "torch", specifier = ">=2.5" },
+    { name = "torchvision", specifier = ">=0.20" },
 ]
 pipeline = [
     { name = "numpy", specifier = ">=2.0" },
