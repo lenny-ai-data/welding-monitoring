@@ -6,6 +6,25 @@ import dash_mantine_components as dmc
 from dash import html
 
 from .. import data
+from ..components import point, section_header
+
+EXPLANATIONS = [
+    point(
+        "Des données réelles",
+        "ce démonstrateur rejoue une campagne d'essais publiée par l'Université de Skövde (Suède). Rien n'est "
+        "inventé : une grandeur qui n'a pas été mesurée (la puissance laser) est affichée comme consigne.",
+    ),
+    point(
+        "Tout est calculé en amont",
+        "préparation des vidéos, entraînement du modèle, calcul des indicateurs et des modèles statistiques sont "
+        "réalisés hors ligne sur GPU ; le site ne fait que restituer les résultats, ce qui le rend léger et sûr.",
+    ),
+    point(
+        "Transposable à une ligne réelle",
+        "le même principe s'applique en production : une caméra, un modèle embarqué près de la machine et un "
+        "écran de supervision qui alerte en temps réel.",
+    ),
+]
 
 CONTACT_URL = os.environ.get("WELDMON_CONTACT_URL", "https://www.linkedin.com/in/lenny-jacquinot-ai-engineer/")
 
@@ -47,6 +66,11 @@ def layout() -> html.Div:
     return html.Div(
         className="tab-body about",
         children=[
+            section_header(
+                "Méthode & sources",
+                "Comment ce démonstrateur a été construit, ce qui est mesuré ou modélisé, et d'où viennent les données.",
+                EXPLANATIONS,
+            ),
             dmc.Paper(
                 className="panel",
                 children=[

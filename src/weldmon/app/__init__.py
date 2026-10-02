@@ -1,9 +1,10 @@
 """Laser Welding Process Monitor — application Dash."""
 
 import dash_mantine_components as dmc
-from dash import Dash, html
+from dash import ALL, ClientsideFunction, Dash, Input, Output, State, clientside_callback, html
 
 from . import data, security
+from .components import icon
 from .tabs import about, doe, live, segmentation
 
 TITLE = "Weld Process Monitor — Lenny Jacquinot"
@@ -11,6 +12,15 @@ DESCRIPTION = (
     "Monitoring de soudage laser rejoué en temps réel : vidéo haute vitesse, segmentation IA "
     "du plasma, des projections et du cordon, et analyse de plan d'expériences."
 )
+
+
+SECTIONS = [
+    # (clé, libellé, icône Lucide, constructeur)
+    ("live", "Monitoring live", "activity", live.layout),
+    ("seg", "Vidéo & masques IA", "scan-eye", segmentation.layout),
+    ("doe", "Analyse DoE", "chart-scatter", doe.layout),
+    ("about", "Méthode & sources", "book-open", about.layout),
+]
 
 
 def header() -> dmc.AppShellHeader:
@@ -23,6 +33,13 @@ def header() -> dmc.AppShellHeader:
                     html.Div(
                         className="brand",
                         children=[
+                            dmc.Burger(
+                                id="nav-burger",
+                                opened=False,
+                                size="sm",
+                                hiddenFrom="sm",
+                                **{"aria-label": "Ouvrir le menu"},
+                            ),
                             html.Span(className="brand-mark", **{"aria-hidden": "true"}),
                             html.Div(
                                 [
@@ -36,20 +53,13 @@ def header() -> dmc.AppShellHeader:
                         className="header-right",
                         children=[
                             html.Span("● REPLAY · données réelles", className="pill-live"),
-                            html.A(
-                                "Dataset Zenodo",
-                                href=data.meta()["dataset"]["url"],
-                                target="_blank",
-                                rel="noopener noreferrer",
-                                className="header-link",
-                            ),
                             dmc.ColorSchemeToggle(
                                 id="color-scheme",
                                 size="lg",
                                 variant="default",
                                 radius="md",
-                                lightIcon=html.Span(className="icon icon-sun"),
-                                darkIcon=html.Span(className="icon icon-moon"),
+                                lightIcon=icon("sun"),
+                                darkIcon=icon("moon"),
                                 **{"aria-label": "Basculer thème clair / sombre"},
                             ),
                         ],
@@ -60,22 +70,46 @@ def header() -> dmc.AppShellHeader:
     )
 
 
-def tabs() -> dmc.Tabs:
-    items = [
-        ("live", "Monitoring live", live.layout),
-        ("seg", "Vidéo & masques IA", segmentation.layout),
-        ("doe", "Analyse DoE", doe.layout),
-        ("about", "Méthode & sources", about.layout),
-    ]
-    return dmc.Tabs(
-        value="live",
-        variant="pills",
-        radius="md",
-        keepMounted=True,
-        className="tabs",
+def navbar() -> dmc.AppShellNavbar:
+    ds = data.meta()["dataset"]
+    return dmc.AppShellNavbar(
+        className="navbar",
         children=[
-            dmc.TabsList([dmc.TabsTab(label, value=key) for key, label, _ in items], className="tabs-list"),
-            *[dmc.TabsPanel(build(), value=key) for key, _, build in items],
+            html.Nav(
+                className="nav-links",
+                children=[
+                    dmc.NavLink(
+                        id={"type": "nav", "index": key},
+                        label=label,
+                        leftSection=icon(icon_name, 18),
+                        active=key == "live",
+                        variant="light",
+                        className="nav-link",
+                        n_clicks=0,
+                    )
+                    for key, label, icon_name, _ in SECTIONS
+                ],
+            ),
+            html.Div(
+                className="nav-footer",
+                children=[
+                    html.Div("Données", className="kpi-label"),
+                    html.A(f"{ds['institution']} · Zenodo", href=ds["url"], target="_blank", rel="noopener noreferrer"),
+                    html.Div(f"Licence {ds['license']}", className="muted"),
+                ],
+            ),
+        ],
+    )
+
+
+def sections() -> html.Div:
+    return html.Div(
+        className="sections",
+        children=[
+            html.Section(
+                build(), id=f"section-{key}", className="section", style={} if key == "live" else {"display": "none"}
+            )
+            for key, _, _, build in SECTIONS
         ],
     )
 
@@ -104,13 +138,30 @@ def create_app() -> Dash:
             "headings": {"fontFamily": "Inter, system-ui, sans-serif"},
         },
         children=dmc.AppShell(
+            id="app-shell",
             header={"height": 64},
+            navbar={"width": 236, "breakpoint": "sm", "collapsed": {"mobile": True}},
             padding="md",
             children=[
                 header(),
-                dmc.AppShellMain(className="main", children=[tabs()]),
+                navbar(),
+                dmc.AppShellMain(className="main", children=[sections()]),
             ],
         ),
     )
     security.install(app, app.csp_hashes())
     return app
+
+
+# Navigation (côté client) : section affichée, lien actif, menu mobile replié, vidéo mise en pause
+# quand on quitte le monitoring.
+clientside_callback(
+    ClientsideFunction("nav", "route"),
+    *[Output(f"section-{key}", "style") for key, *_ in SECTIONS],
+    Output({"type": "nav", "index": ALL}, "active"),
+    Output("app-shell", "navbar"),
+    Output("nav-burger", "opened"),
+    Input({"type": "nav", "index": ALL}, "n_clicks"),
+    Input("nav-burger", "opened"),
+    State("app-shell", "navbar"),
+)
