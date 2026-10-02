@@ -1,20 +1,26 @@
 # Laser Welding Process Monitor
 
-Dashboard de démonstration (Dash / Plotly) qui **rejoue comme en temps réel** le monitoring d'un procédé de
-soudage laser. Il s'appuie sur des vidéos haute vitesse réelles, sur un modèle de segmentation entraîné pour
-l'occasion (cordon, plasma, projections) et sur l'analyse du plan d'expériences Box-Behnken de la campagne.
+Dashboard de démonstration (Dash / Plotly) de **monitoring de production** d'un procédé de soudage laser :
+suivi qualité de 81 soudures réelles, puis relecture de chacune image par image avec ses signaux de procédé. Il
+s'appuie sur des vidéos haute vitesse réelles, sur un modèle de segmentation entraîné pour l'occasion (cordon,
+plasma, projections) et sur l'analyse statistique du plan d'expériences Box-Behnken de la campagne.
 
 > Projet personnel de [Lenny Jacquinot](https://www.linkedin.com/in/lenny-jacquinot-ai-engineer/), IA & Data pour l'industrie.
 
 | Onglet | Contenu |
 |---|---|
-| **Monitoring live** | Vidéo synchronisée avec 5 pistes (puissance, vitesse consigne/mesurée, plasma, projections, cordon). Indicateurs instantanés, alarmes, journal d'événements, mode « ligne de production » qui enchaîne les runs dans l'ordre réel de soudage. |
+| **Suivi & historique** | Verdict qualité de chaque soudure (OK / OK avec warning / NOK, d'après ses alarmes), campagne la plus récente en premier, filtres par verdict, courbe des alarmes dans l'ordre de production, détail d'une soudure et ouverture dans le monitoring. |
+| **Monitoring process** | Relecture d'une soudure (ralentie ×200) : lecteur avec lecture / pause et timeline des événements, statut instantané (tir, alarme, veille), indicateurs à anneaux qui virent au doré près des limites et au rouge en alarme, courbes plasma / vitesse (bande ±10 %) / projections / cordon, journal d'événements, enchaînement des soudures dans l'ordre réel. |
 | **Segmentation IA** | Annotation humaine vs prédiction du U-Net, frame par frame (côte à côte ou carte des désaccords). Métriques sur les vidéos d'évaluation, comparaison avec une baseline de vision classique. |
-| **Analyse DoE** | Surfaces de réponse quadratiques, effets standardisés, effets principaux, carte de contrôle I-MR des résidus, énergie linéique. |
+| **Analyses** | Surfaces de réponse quadratiques, effets standardisés, effets principaux, carte de contrôle I-MR des résidus, énergie linéique — à réévaluer au fil de la production. |
 | **Méthode & sources** | Chaîne de traitement, statut de chaque signal (mesuré / consigne / modélisé), étalonnage, licence. |
 
-Navigation par barre latérale repliable (icônes seules), liens directs `#live`, `#seg`, `#doe`, `#about`, et un
-bandeau « Infos et explications » dans chaque section pour un public non spécialiste.
+Navigation par barre latérale repliable (icônes seules), liens directs `#suivi`, `#process`, `#seg`, `#analyses`,
+`#about`, et un bandeau « Infos et explications » dans chaque section pour un public non spécialiste.
+
+**Verdict d'une soudure** : OK jusqu'à 10 alarmes (pics de plasma + rafales de projections), OK avec warning
+jusqu'à 15, NOK au-delà ou dès qu'un écart de vitesse soutenu (±20 % pendant 5 ms) est détecté. Limites de
+vigilance des indicateurs : vitesse ±10 % de la consigne, instabilité au 90ᵉ centile des 81 soudures.
 
 ## Ce que l'on montre — et ce que l'on ne prétend pas
 
@@ -47,9 +53,9 @@ src/weldmon/app/
   __init__.py  create_app() — mise en page, thème
   security.py  en-têtes HTTP, routes /media, /overlay, /healthz
   data.py      accès lecture seule aux artefacts, liste blanche des runs
-  theme.py     jetons clair / sombre, palette plasma validée (daltonisme, contraste)
-  tabs/        live, segmentation, doe, about
-  assets/      CSS, logique client (live.js, seg.js), polices auto-hébergées
+  theme.py     jetons clair / sombre, violet de l'interface, couleurs de classes validées (daltonisme, contraste)
+  tabs/        history (suivi), process, segmentation, doe (analyses), about
+  assets/      CSS, logique client (process.js, history.js, seg.js, nav.js), polices Sora / JetBrains Mono et logo auto-hébergés
 ```
 
 Principe : **tout est précalculé**. Le serveur ne sert que la mise en page et des fichiers statiques. Le
