@@ -24,11 +24,13 @@ def test_index_has_security_headers(client):
     assert r.headers["X-Content-Type-Options"] == "nosniff"
     assert r.headers["X-Frame-Options"] == "DENY"
     assert "Strict-Transport-Security" not in r.headers  # uniquement derrière HTTPS
+    assert "Cross-Origin-Opener-Policy" not in r.headers
 
 
 def test_hsts_behind_https_proxy(client):
     r = client.get("/healthz", headers={"X-Forwarded-Proto": "https"})
     assert r.headers["Strict-Transport-Security"].startswith("max-age=")
+    assert r.headers["Cross-Origin-Opener-Policy"] == "same-origin"
 
 
 def test_healthz(client):
