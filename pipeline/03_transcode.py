@@ -9,7 +9,6 @@ import subprocess
 from concurrent.futures import ThreadPoolExecutor
 
 import pandas as pd
-
 from common import APP_DATA, PLAYBACK_FPS, PROCESSED, SIZE, video_path
 
 OUT_VIDEOS = APP_DATA / "media" / "videos"
@@ -18,9 +17,22 @@ OUT_POSTERS = APP_DATA / "media" / "posters"
 
 def count_frames(path) -> int:
     out = subprocess.run(
-        ["ffprobe", "-v", "error", "-count_packets", "-select_streams", "v:0",
-         "-show_entries", "stream=nb_read_packets", "-of", "json", str(path)],
-        capture_output=True, check=True, text=True,
+        [
+            "ffprobe",
+            "-v",
+            "error",
+            "-count_packets",
+            "-select_streams",
+            "v:0",
+            "-show_entries",
+            "stream=nb_read_packets",
+            "-of",
+            "json",
+            str(path),
+        ],
+        capture_output=True,
+        check=True,
+        text=True,
     )
     return int(json.loads(out.stdout)["streams"][0]["nb_read_packets"])
 
@@ -31,22 +43,59 @@ def transcode(run: dict) -> dict:
     poster = OUT_POSTERS / f"{run['run_id']}.jpg"
     if not dst.exists():
         subprocess.run(
-            ["ffmpeg", "-v", "error", "-y", "-r", str(PLAYBACK_FPS), "-i", str(src),
-             "-vf", f"scale={SIZE}:{SIZE}:flags=area,format=yuv420p",
-             "-c:v", "libx264", "-preset", "slow", "-crf", "28", "-g", str(PLAYBACK_FPS),
-             "-an", "-movflags", "+faststart", str(dst)],
+            [
+                "ffmpeg",
+                "-v",
+                "error",
+                "-y",
+                "-r",
+                str(PLAYBACK_FPS),
+                "-i",
+                str(src),
+                "-vf",
+                f"scale={SIZE}:{SIZE}:flags=area,format=yuv420p",
+                "-c:v",
+                "libx264",
+                "-preset",
+                "slower",
+                "-crf",
+                "32",
+                "-g",
+                str(PLAYBACK_FPS),
+                "-an",
+                "-movflags",
+                "+faststart",
+                str(dst),
+            ],
             check=True,
         )
     if not poster.exists():
         # Image d'attente : milieu de la phase de soudage (~35 % de la vidéo).
         t = 0.35 * run["n_frames"] / PLAYBACK_FPS
         subprocess.run(
-            ["ffmpeg", "-v", "error", "-y", "-ss", f"{t:.3f}", "-i", str(dst),
-             "-frames:v", "1", "-q:v", "4", str(poster)],
+            [
+                "ffmpeg",
+                "-v",
+                "error",
+                "-y",
+                "-ss",
+                f"{t:.3f}",
+                "-i",
+                str(dst),
+                "-frames:v",
+                "1",
+                "-q:v",
+                "4",
+                str(poster),
+            ],
             check=True,
         )
-    return {"run_id": run["run_id"], "frames_mp4": count_frames(dst),
-            "n_frames": run["n_frames"], "mb": dst.stat().st_size / 1e6}
+    return {
+        "run_id": run["run_id"],
+        "frames_mp4": count_frames(dst),
+        "n_frames": run["n_frames"],
+        "mb": dst.stat().st_size / 1e6,
+    }
 
 
 def main() -> None:
