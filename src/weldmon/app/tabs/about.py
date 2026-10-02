@@ -1,7 +1,5 @@
 """Onglet « Méthode & sources » : chaîne de traitement, statut de chaque signal, attribution."""
 
-import os
-
 import dash_mantine_components as dmc
 from dash import html
 
@@ -26,7 +24,6 @@ EXPLANATIONS = [
     ),
 ]
 
-CONTACT_URL = os.environ.get("WELDMON_CONTACT_URL", "https://www.linkedin.com/in/lenny-jacquinot-ai-engineer/")
 
 PIPELINE = [
     ("Acquisition", "81 vidéos Photron 6 000–9 000 im/s, plan Box-Behnken 4 facteurs × 3 séries"),
@@ -221,28 +218,6 @@ def layout() -> html.Div:
                         ]
                     ),
                     html.P(["Modifications : ", ds["changes"]], className="muted small"),
-                ],
-            ),
-            dmc.Paper(
-                className="panel cta",
-                mt="md",
-                children=[
-                    html.Div(
-                        [
-                            html.H3("Vous voulez le même suivi sur votre ligne ?", className="panel-title"),
-                            html.P(
-                                "Vision industrielle, IA embarquée, monitoring procédé et analyse de plans d'expériences : "
-                                "du prototype au déploiement sur site."
-                            ),
-                        ]
-                    ),
-                    html.A(
-                        "Contacter l'auteur",
-                        href=CONTACT_URL,
-                        className="cta-button",
-                        target="_blank",
-                        rel="noopener noreferrer",
-                    ),
                 ],
             ),
         ],

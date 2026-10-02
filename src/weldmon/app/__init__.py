@@ -1,13 +1,16 @@
 """Laser Welding Process Monitor — application Dash."""
 
+import os
+
 import dash_mantine_components as dmc
 from dash import ALL, ClientsideFunction, Dash, Input, Output, State, clientside_callback, html
 
-from . import data, security
+from . import security
 from .components import icon
 from .tabs import about, doe, live, segmentation
 
 TITLE = "Weld Process Monitor — Lenny Jacquinot"
+CONTACT_URL = os.environ.get("WELDMON_CONTACT_URL", "https://www.linkedin.com/in/lenny-jacquinot-ai-engineer/")
 DESCRIPTION = (
     "Monitoring de soudage laser rejoué en temps réel : vidéo haute vitesse, segmentation IA "
     "du plasma, des projections et du cordon, et analyse de plan d'expériences."
@@ -17,10 +20,11 @@ DESCRIPTION = (
 SECTIONS = [
     # (clé, libellé, icône Lucide, constructeur)
     ("live", "Monitoring live", "activity", live.layout),
-    ("seg", "Vidéo & masques IA", "scan-eye", segmentation.layout),
+    ("seg", "Segmentation IA", "scan-eye", segmentation.layout),
     ("doe", "Analyse DoE", "chart-scatter", doe.layout),
     ("about", "Méthode & sources", "book-open", about.layout),
 ]
+NAV_WIDTH = {"expanded": 240, "collapsed": 72}
 
 
 def header() -> dmc.AppShellHeader:
@@ -40,7 +44,8 @@ def header() -> dmc.AppShellHeader:
                                 hiddenFrom="sm",
                                 **{"aria-label": "Ouvrir le menu"},
                             ),
-                            html.Span(className="brand-mark", **{"aria-hidden": "true"}),
+                            # Sur mobile, la barre latérale est masquée : le logo reste visible ici.
+                            dmc.Box(html.Span(className="brand-mark", **{"aria-hidden": "true"}), hiddenFrom="sm"),
                             html.Div(
                                 [
                                     html.Div("Weld Process Monitor", className="brand-title"),
@@ -70,32 +75,72 @@ def header() -> dmc.AppShellHeader:
     )
 
 
+def tip(tip_id, label: str, child) -> dmc.Tooltip:
+    """Infobulle à droite, active seulement quand la barre est repliée (icônes seules)."""
+    return dmc.Tooltip(id=tip_id, label=label, position="right", withArrow=True, disabled=True, children=child)
+
+
 def navbar() -> dmc.AppShellNavbar:
-    ds = data.meta()["dataset"]
     return dmc.AppShellNavbar(
         className="navbar",
         children=[
+            # Logo seul : le nom et la baseline sont dans l'en-tête, alignés sur le contenu.
+            html.Div(className="nav-top", children=html.Span(className="brand-mark", **{"aria-hidden": "true"})),
             html.Nav(
                 className="nav-links",
                 children=[
-                    dmc.NavLink(
-                        id={"type": "nav", "index": key},
-                        label=label,
-                        leftSection=icon(icon_name, 18),
-                        active=key == "live",
-                        variant="light",
-                        className="nav-link",
-                        n_clicks=0,
+                    tip(
+                        {"type": "nav-tip", "index": key},
+                        label,
+                        dmc.NavLink(
+                            id={"type": "nav", "index": key},
+                            label=label,
+                            leftSection=icon(icon_name, 18),
+                            active=key == "live",
+                            variant="light",
+                            className="nav-link",
+                            n_clicks=0,
+                        ),
                     )
                     for key, label, icon_name, _ in SECTIONS
                 ],
             ),
             html.Div(
-                className="nav-footer",
+                className="nav-bottom",
                 children=[
-                    html.Div("Données", className="kpi-label"),
-                    html.A(f"{ds['institution']} · Zenodo", href=ds["url"], target="_blank", rel="noopener noreferrer"),
-                    html.Div(f"Licence {ds['license']}", className="muted"),
+                    html.Div(
+                        className="nav-contact nav-text",
+                        children=[
+                            html.Div("Le même suivi sur votre ligne ?", className="nav-contact-title"),
+                            html.P(
+                                "Vision industrielle, IA embarquée, monitoring procédé et plans d'expériences : "
+                                "du prototype au déploiement sur site."
+                            ),
+                        ],
+                    ),
+                    tip(
+                        "contact-tip",
+                        "Contacter l'auteur",
+                        html.A(
+                            [icon("mail", 16), html.Span("Contacter l'auteur", className="nav-text")],
+                            href=CONTACT_URL,
+                            className="cta-button nav-cta",
+                            target="_blank",
+                            rel="noopener noreferrer",
+                            **{"aria-label": "Contacter l'auteur"},
+                        ),
+                    ),
+                    dmc.ActionIcon(
+                        id="nav-collapse",
+                        variant="subtle",
+                        color="gray",
+                        size="lg",
+                        visibleFrom="sm",
+                        className="nav-collapse",
+                        n_clicks=0,
+                        children=[icon("panel-left-close", 18), icon("panel-left-open", 18)],
+                        **{"aria-label": "Replier / déplier le menu"},
+                    ),
                 ],
             ),
         ],
@@ -139,8 +184,9 @@ def create_app() -> Dash:
         },
         children=dmc.AppShell(
             id="app-shell",
+            layout="alt",  # barre latérale pleine hauteur : l'en-tête s'aligne sur le contenu
             header={"height": 64},
-            navbar={"width": 236, "breakpoint": "sm", "collapsed": {"mobile": True}},
+            navbar={"width": NAV_WIDTH["expanded"], "breakpoint": "sm", "collapsed": {"mobile": True}},
             padding="md",
             children=[
                 header(),
@@ -153,15 +199,19 @@ def create_app() -> Dash:
     return app
 
 
-# Navigation (côté client) : section affichée, lien actif, menu mobile replié, vidéo mise en pause
-# quand on quitte le monitoring.
+# Navigation (côté client) : section affichée, lien actif, barre repliée / dépliée, menu mobile,
+# vidéo mise en pause quand on quitte le monitoring.
 clientside_callback(
     ClientsideFunction("nav", "route"),
     *[Output(f"section-{key}", "style") for key, *_ in SECTIONS],
     Output({"type": "nav", "index": ALL}, "active"),
+    Output({"type": "nav-tip", "index": ALL}, "disabled"),
+    Output("contact-tip", "disabled"),
     Output("app-shell", "navbar"),
+    Output("app-shell", "className"),
     Output("nav-burger", "opened"),
     Input({"type": "nav", "index": ALL}, "n_clicks"),
     Input("nav-burger", "opened"),
+    Input("nav-collapse", "n_clicks"),
     State("app-shell", "navbar"),
 )

@@ -1,24 +1,49 @@
-/* Navigation latérale : une section visible à la fois, lien profond via #ancre, menu mobile. */
+/* Navigation latérale : une section visible à la fois, lien profond via #ancre, barre repliable
+ * (icônes seules, préférence mémorisée dans le navigateur), menu burger sur mobile. */
 (function () {
   "use strict";
 
   const KEYS = ["live", "seg", "doe", "about"]; // même ordre que SECTIONS (app/__init__.py)
+  const WIDTH = { expanded: 240, collapsed: 72 }; // = NAV_WIDTH
+  const STORAGE_KEY = "weldmon-nav-collapsed";
   let current = null;
+  let collapsed = null;
 
   function fromHash() {
     const key = window.location.hash.replace("#", "");
     return KEYS.includes(key) ? key : "live";
   }
 
+  function readCollapsed() {
+    try {
+      return window.localStorage.getItem(STORAGE_KEY) === "1";
+    } catch (e) {
+      return false; // stockage indisponible (navigation privée...) : barre dépliée
+    }
+  }
+
+  function saveCollapsed(value) {
+    try {
+      window.localStorage.setItem(STORAGE_KEY, value ? "1" : "0");
+    } catch (e) {
+      /* préférence non mémorisée, sans conséquence */
+    }
+  }
+
   window.dash_clientside = Object.assign({}, window.dash_clientside, {
     nav: {
-      route: function (_clicks, burgerOpened, navbar) {
+      route: function (_clicks, burgerOpened, _collapseClicks, navbar) {
         const ctx = window.dash_clientside.callback_context;
         const trig = ctx && ctx.triggered_id;
         let opened = Boolean(burgerOpened);
 
         if (current === null) current = fromHash();
-        if (trig && typeof trig === "object" && trig.type === "nav") {
+        if (collapsed === null) collapsed = readCollapsed();
+
+        if (trig === "nav-collapse") {
+          collapsed = !collapsed;
+          saveCollapsed(collapsed);
+        } else if (trig && typeof trig === "object" && trig.type === "nav") {
           current = trig.index;
           opened = false; // sur mobile, le menu se referme après un choix
           if (window.location.hash !== "#" + current) {
@@ -35,9 +60,20 @@
 
         const styles = KEYS.map((k) => (k === current ? {} : { display: "none" }));
         const nav = Object.assign({}, navbar, {
+          width: collapsed ? WIDTH.collapsed : WIDTH.expanded,
           collapsed: Object.assign({}, (navbar && navbar.collapsed) || {}, { mobile: !opened }),
         });
-        return [...styles, KEYS.map((k) => k === current), nav, opened];
+        // Les graphes Plotly suivent la nouvelle largeur du contenu.
+        window.setTimeout(() => window.dispatchEvent(new Event("resize")), 250);
+        return [
+          ...styles,
+          KEYS.map((k) => k === current),
+          KEYS.map(() => !collapsed),
+          !collapsed,
+          nav,
+          collapsed ? "app-shell nav-collapsed" : "app-shell",
+          opened,
+        ];
       },
     },
   });
