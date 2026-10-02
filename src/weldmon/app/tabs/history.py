@@ -32,11 +32,6 @@ EXPLANATIONS = [
         "les cartes du haut filtrent la grille ; un clic sur un essai (ou sur un point de la courbe) affiche son "
         "détail, et le bouton « Ouvrir dans Monitoring process » rejoue la soudure image par image.",
     ),
-    point(
-        "Fiabilité",
-        "l'IA a été entraînée sur la campagne DoE3 ; DoE1 et DoE2 ont un éclairage et un cadrage différents. "
-        "Leurs verdicts sont indicatifs — c'est signalé dans le détail de chaque soudure.",
-    ),
 ]
 
 
@@ -83,7 +78,7 @@ def campaign_block(serie: str) -> html.Div:
     rs = [r for r in runs_sorted() if r["serie"] == serie]
     dates = sorted(r["recorded_at"] for r in rs)
     counts = {k: sum(r["verdict"] == k for r in rs) for k in VERDICTS}
-    span = f"{dates[0][8:10]}/{dates[0][5:7]} → {dates[-1][8:10]}/{dates[-1][5:7]}/{dates[-1][:4]}"
+    span = f"du {dates[0][8:10]}/{dates[0][5:7]} au {dates[-1][8:10]}/{dates[-1][5:7]}/{dates[-1][2:4]}"
     return html.Div(
         className="campaign",
         children=[
@@ -121,7 +116,7 @@ def campaign_block(serie: str) -> html.Div:
                         n_clicks=0,
                         type="button",
                         className=f"run-tile v-{r['verdict']}" + (" is-selected" if r["run_id"] == DEFAULT_RUN else ""),
-                        title=f"{serie} · essai {r['point']} — {VERDICTS[r['verdict']][0]}",
+                        title=f"{serie} · essai {r['point']} : {VERDICTS[r['verdict']][0]}",
                         **{"aria-label": f"{serie} essai {r['point']} : {VERDICTS[r['verdict']][0]}"},
                     )
                     for r in rs
@@ -170,7 +165,7 @@ def layout() -> html.Div:
                                     dcc.Graph(
                                         id="hist-trend",
                                         config={"displayModeBar": False, "responsive": True},
-                                        style={"height": "190px"},
+                                        style={"height": "250px"},
                                     ),
                                 ],
                             ),
@@ -200,19 +195,20 @@ def layout() -> html.Div:
 
 def fmt(v, nd=1, unit="") -> str:
     if v is None:
-        return "—"
+        return "-"
     return f"{v:.{nd}f}".replace(".", ",").replace("-", "−") + (f" {unit}" if unit else "")
 
 
 def detail(run: dict) -> list:
     q = data.meta()["quality"]
     n_ok, n_warn = q["verdict_ok_max_alarms"], q["verdict_warn_max_alarms"]
+    # Barres sur l'échelle du verdict : 15 alarmes (limite NOK) pour les pics et rafales, un seul écart
+    # de vitesse suffit à rendre la soudure NOK.
     alarms = [
-        ("Pics de plasma", run["n_plasma_spike"], "alarm"),
-        ("Rafales de projections", run["n_spatter_burst"], "gold"),
-        ("Écarts de vitesse", run["n_speed_deviation"], "alarm"),
+        ("Pics de plasma", run["n_plasma_spike"], n_warn, "warn"),
+        ("Rafales de projections", run["n_spatter_burst"], n_warn, "warn"),
+        ("Écarts de vitesse", run["n_speed_deviation"], 1, "nok"),
     ]
-    top = max(1, *(n for _, n, _ in alarms))
     speed_err = run["speed_error_pct"]
     rule = (
         "écart de vitesse soutenu"
@@ -225,7 +221,7 @@ def detail(run: dict) -> list:
         verdict_badge(run["verdict"]),
         html.Div(
             f"{run['exec_rank']}ᵉ soudure de la campagne · {run['recorded_at'][8:10]}/{run['recorded_at'][5:7]}/"
-            f"{run['recorded_at'][:4]} {run['recorded_at'][11:16]}",
+            f"{run['recorded_at'][2:4]} {run['recorded_at'][11:16]}",
             className="muted small",
         ),
         html.Div(f"Verdict : {rule}", className="muted small"),
@@ -249,13 +245,14 @@ def detail(run: dict) -> list:
                     [
                         html.Span(label, className="muted"),
                         html.Span(
-                            html.Span(className=f"fill-{tone}", style={"width": f"{100 * n / top:.0f}%"}),
+                            html.Span(className=f"fill-{tone}", style={"width": f"{100 * min(n / scale, 1):.0f}%"}),
                             className="detail-bar",
+                            title=f"{n} sur {scale}",
                         ),
                         html.Strong(str(n)),
                     ]
                 )
-                for label, n, tone in alarms
+                for label, n, scale, tone in alarms
             ],
         ),
         html.H4("Mesures vision"),
@@ -276,17 +273,6 @@ def detail(run: dict) -> list:
                 for item in (html.Dt(k), html.Dd(v))
             ],
         ),
-        html.Div(
-            className="detail-domain" + ("" if run["in_domain"] else " is-out"),
-            children=[
-                icon("circle-check" if run["in_domain"] else "triangle-alert", 14),
-                html.Span(
-                    "Analyse IA dans le domaine validé (campagne DoE3)."
-                    if run["in_domain"]
-                    else "Campagne hors du domaine d'entraînement de l'IA : verdict indicatif."
-                ),
-            ],
-        ),
     ]
 
 
@@ -303,7 +289,7 @@ def trend_figure(selected: str, flt: str, scheme) -> dict:
             "x": x,
             "y": [r["n_alarms"] for r in runs],
             "customdata": [r["run_id"] for r in runs],
-            "text": [f"{r['serie']} · essai {r['point']} — {VERDICTS[r['verdict']][0]}" for r in runs],
+            "text": [f"{r['serie']} · essai {r['point']} : {VERDICTS[r['verdict']][0]}" for r in runs],
             "hovertemplate": "%{text}<br>%{y} alarmes<extra></extra>",
             "marker": {
                 "size": [13 if r["run_id"] == selected else 9 for r in runs],

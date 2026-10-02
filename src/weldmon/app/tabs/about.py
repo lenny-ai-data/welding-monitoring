@@ -9,13 +9,13 @@ from ..components import point, section_header
 EXPLANATIONS = [
     point(
         "Des données réelles",
-        "ce démonstrateur rejoue une campagne d'essais publiée par l'Université de Skövde (Suède). Rien n'est "
-        "inventé : une grandeur qui n'a pas été mesurée (la puissance laser) est affichée comme consigne.",
+        "ce démonstrateur rejoue une campagne d'essais publiée par l'Université de Skövde (Suède). Une grandeur "
+        "qui n'a pas été mesurée (la puissance laser) est affichée comme consigne.",
     ),
     point(
         "Tout est calculé en amont",
         "préparation des vidéos, entraînement du modèle, calcul des indicateurs et des modèles statistiques sont "
-        "réalisés hors ligne sur GPU ; le site ne fait que restituer les résultats, ce qui le rend léger et sûr.",
+        "réalisés hors ligne sur GPU. Le site affiche seulement les résultats, sans calcul lourd à la volée.",
     ),
     point(
         "Transposable à une ligne réelle",
@@ -26,11 +26,11 @@ EXPLANATIONS = [
 
 
 PIPELINE = [
-    ("Acquisition", "81 vidéos Photron 6 000–9 000 im/s, plan Box-Behnken 4 facteurs × 3 séries"),
+    ("Acquisition", "81 vidéos Photron 6 000 à 9 000 im/s, plan Box-Behnken 4 facteurs × 3 séries"),
     ("Annotation", "8 vidéos annotées (SAM2 + relecture humaine) : cordon, plasma, projections"),
     ("Modèle IA", "U-Net entraîné sur 6 vidéos (dont 1 de validation), évalué sur 2 vidéos jamais vues"),
     ("Inférence", "59 830 frames segmentées, mesures géométriques par frame"),
-    ("Signaux & KPI", "étalonnage px → mm, détection ON/OFF, vitesse, stabilité, alarmes"),
+    ("Signaux & KPI", "conversion pixels en mm, détection ON/OFF, vitesse, stabilité, alarmes"),
     ("Suivi & analyses", "verdict par soudure, surfaces de réponse, effets, cartes de contrôle"),
 ]
 
@@ -42,8 +42,8 @@ SIGNALS = [
         "Valeur du plan d'expériences, appliquée entre l'allumage et l'extinction "
         "détectés à l'image. Aucun capteur de puissance n'est fourni.",
     ),
-    ("Vitesse d'avance — consigne", "Consigne", "Valeur du plan d'expériences."),
-    ("Vitesse d'avance — mesurée", "Mesuré (IA)", "Dérivée lissée de la position du front du cordon segmenté."),
+    ("Vitesse d'avance (consigne)", "Consigne", "Valeur du plan d'expériences."),
+    ("Vitesse d'avance (mesurée)", "Mesuré (IA)", "Dérivée lissée de la position du front du cordon segmenté."),
     ("Plasma, projections, cordon", "Mesuré (IA)", "Segmentation U-Net de chaque frame, converties en mm / mm²."),
     (
         "Alarmes",
@@ -59,7 +59,13 @@ SIGNALS = [
     ("Surfaces de réponse", "Modélisé", "Modèle quadratique complet + effet de série, ajusté sur les 81 runs."),
 ]
 
-BADGE_COLOR = {"Mesuré": "teal", "Mesuré (IA)": "grape", "Consigne": "gray", "Calculé": "orange", "Modélisé": "indigo"}
+BADGE_CLASS = {
+    "Mesuré": "mesure",
+    "Mesuré (IA)": "ia",
+    "Consigne": "consigne",
+    "Calculé": "calcule",
+    "Modélisé": "modelise",
+}
 
 
 def pct(v: float) -> str:
@@ -123,15 +129,7 @@ def signals_panel() -> html.Div:
                             html.Tr(
                                 [
                                     html.Td(name),
-                                    html.Td(
-                                        dmc.Badge(
-                                            status,
-                                            variant="light",
-                                            size="sm",
-                                            className="badge-full",
-                                            color=BADGE_COLOR[status],
-                                        )
-                                    ),
+                                    html.Td(html.Span(status, className=f"status-badge sb-{BADGE_CLASS[status]}")),
                                     html.Td(desc, className="small"),
                                 ]
                             )
@@ -176,7 +174,7 @@ def layout() -> html.Div:
                     html.P(
                         [
                             html.Em(ds["title"]),
-                            f" — {ds['authors']}, {ds['institution']}, {ds['year']}. DOI ",
+                            f", {ds['authors']}, {ds['institution']}, {ds['year']}. DOI ",
                             html.A(ds["doi"], href=ds["url"], target="_blank", rel="noopener noreferrer"),
                             ". Licence ",
                             html.A(ds["license"], href=ds["license_url"], target="_blank", rel="noopener noreferrer"),

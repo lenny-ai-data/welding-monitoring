@@ -47,9 +47,8 @@ EXPLANATIONS = [
     ),
     point(
         "Le facteur « série »",
-        "un facteur de bloc qui absorbe les écarts entre campagnes (réglages machine, mais aussi éclairage et "
-        "cadrage différents, alors que le modèle IA n'a été entraîné que sur DoE3). Le traiter ainsi évite de "
-        "biaiser les effets des quatre réglages du plan.",
+        "un facteur de bloc qui absorbe les écarts entre campagnes (réglages machine, éclairage, cadrage). Il "
+        "évite de biaiser les effets des quatre réglages du plan.",
     ),
 ]
 
@@ -90,8 +89,7 @@ def layout() -> html.Div:
         children=[
             section_header(
                 "Analyses",
-                "Quels réglages de la machine influencent la qualité ? Modèles statistiques ajustés sur les 81 "
-                "soudures, à réévaluer au fil de la production.",
+                "Quels réglages influencent la qualité ? Modèles ajustés sur les 81 soudures, à réévaluer en production.",
                 EXPLANATIONS,
                 aside=[
                     dmc.Select(
@@ -102,6 +100,7 @@ def layout() -> html.Div:
                         allowDeselect=False,
                         w=300,
                         size="sm",
+                        className="select-accent",
                     ),
                     dmc.Select(
                         id="doe-x",
@@ -111,6 +110,7 @@ def layout() -> html.Div:
                         allowDeselect=False,
                         w=240,
                         size="sm",
+                        className="select-accent",
                     ),
                     dmc.Select(
                         id="doe-y",
@@ -120,6 +120,7 @@ def layout() -> html.Div:
                         allowDeselect=False,
                         w=240,
                         size="sm",
+                        className="select-accent",
                     ),
                 ],
             ),
@@ -491,7 +492,7 @@ def update(kpi_key, fx, fy, scheme):
         dmc.Badge(f"R² ajusté = {fmt(kpi['r2_adj'])}", variant="light", color="gray"),
         dmc.Badge(f"{kpi['n']} runs · {kpi['dof']} ddl", variant="light", color="gray"),
     ]
-    title = f"Surface de réponse — {kpi['label']}"
+    title = f"Surface de réponse : {kpi['label'].lower()}"
     return (
         surface_fig(kpi_key, fx, fy, scheme),
         pareto_fig(kpi_key, scheme),

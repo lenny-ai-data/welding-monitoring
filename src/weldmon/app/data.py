@@ -68,7 +68,7 @@ def labeled_runs() -> list[str]:
 
 def run_label(run: dict) -> str:
     return (
-        f"{run['serie']} · essai {run['point']:>2} — {run['power_w']:.0f} W · "
+        f"{run['serie']} · essai {run['point']:>2}, {run['power_w']:.0f} W · "
         f"{run['feedrate_mm_s']:.0f} mm/s · déf. {run['defocus_mm']:+.1f} mm · PFO {run['pfo_y_mm']:.0f} mm"
     )
 

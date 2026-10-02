@@ -39,7 +39,7 @@ EXPLANATIONS = [
     point(
         "Les masques IA",
         "un modèle d'intelligence artificielle repère sur chaque image le cordon de soudure (violet), le panache "
-        "de plasma (orange) — la vapeur de métal ionisée au-dessus du point de soudage — et les projections de "
+        "de plasma (orange), c'est-à-dire la vapeur de métal ionisée au-dessus du point de soudage, et les projections de "
         "métal fondu (magenta). Le bouton en haut à droite de la vidéo les masque.",
     ),
     point(
@@ -51,11 +51,6 @@ EXPLANATIONS = [
     point(
         "Enchaîner",
         "activé, le lecteur passe automatiquement à la soudure suivante, dans l'ordre réel de production.",
-    ),
-    point(
-        "Badge « hors domaine »",
-        "le modèle a appris sur la campagne DoE3 ; DoE1 et DoE2 ont été filmées avec un éclairage et un cadrage "
-        "différents. Les mesures y restent exploitables mais moins précises — c'est signalé, pas caché.",
     ),
 ]
 
@@ -108,7 +103,7 @@ def kpi_card(key: str, label: str, unit: str) -> html.Div:
                 children=[
                     html.Div(label, className="kpi-label"),
                     html.Div(
-                        [html.Span("—", id=f"kpi-{key}", className="kpi-num"), html.Span(unit, className="kpi-unit")],
+                        [html.Span("-", id=f"kpi-{key}", className="kpi-num"), html.Span(unit, className="kpi-unit")],
                         className="kpi-value",
                     ),
                     html.Div("", id=f"kpi-{key}-sub", className="kpi-sub"),
@@ -513,7 +508,6 @@ def params_table(run: dict) -> list:
     rows = [
         ("Puissance", f"{fmt(run['power_w'], 0)} W"),
         ("Vitesse d'avance", f"{run['feedrate_mm_s']:.0f} mm/s"),
-        ("Énergie linéique", f"{fmt(run['line_energy_j_mm'])} J/mm"),
         ("Défocalisation", f"{'+' if run['defocus_mm'] > 0 else ''}{fmt(run['defocus_mm'])} mm"),
         ("PFO Y", f"{run['pfo_y_mm']:.0f} mm · {fmt(run['inclination_deg'])}°"),
         ("Caméra", f"{fmt(run['fps'], 0)} im/s · {run['duration_ms']:.0f} ms"),
@@ -524,17 +518,6 @@ def params_table(run: dict) -> list:
         ),
     ]
     badges = []
-    if not run["in_domain"]:
-        badges.append(
-            dmc.Tooltip(
-                label="Le modèle IA a été entraîné sur la campagne DoE3 uniquement. Cette campagne a un éclairage "
-                "et un cadrage différents : les mesures vision y sont moins fiables.",
-                multiline=True,
-                w=280,
-                withArrow=True,
-                children=dmc.Badge("Hors domaine d'entraînement", variant="outline", color="yellow", size="sm"),
-            )
-        )
     if run.get("front_fit_r2") is not None and run["front_fit_r2"] < 0.9:
         badges.append(
             dmc.Tooltip(

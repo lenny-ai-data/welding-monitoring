@@ -1,4 +1,4 @@
-"""Laser Welding Process Monitor — application Dash."""
+"""Laser Welding Process Monitor : application Dash."""
 
 import os
 
@@ -9,7 +9,7 @@ from . import security, theme
 from .components import icon
 from .tabs import about, doe, history, process, segmentation
 
-TITLE = "Weld Process Monitor — Lenny Jacquinot"
+TITLE = "Weld Process Monitor | Lenny Jacquinot"
 CONTACT_URL = os.environ.get("WELDMON_CONTACT_URL", "https://www.linkedin.com/in/lenny-jacquinot-ai-engineer/")
 DESCRIPTION = (
     "Monitoring de production d'une soudure laser : suivi qualité de 81 soudures réelles, relecture "
@@ -83,6 +83,17 @@ def navbar() -> dmc.AppShellNavbar:
                 children=[
                     wordmark(),
                     html.Img(src="/assets/brand/mark.png", alt="Lenny Jacquinot", className="nav-mark"),
+                    dmc.ActionIcon(
+                        id="nav-collapse",
+                        variant="subtle",
+                        color="gray",
+                        size="lg",
+                        visibleFrom="sm",
+                        className="nav-collapse",
+                        n_clicks=0,
+                        children=[icon("panel-left-close", 18), icon("panel-left-open", 18)],
+                        **{"aria-label": "Replier / déplier le menu"},
+                    ),
                 ],
             ),
             html.Nav(
@@ -107,6 +118,7 @@ def navbar() -> dmc.AppShellNavbar:
             html.Div(
                 className="nav-bottom",
                 children=[
+                    dmc.Box(html.Div(theme_toggle("color-scheme"), className="nav-tools"), visibleFrom="sm"),
                     html.Div(
                         className="nav-contact nav-text",
                         children=[
@@ -131,23 +143,6 @@ def navbar() -> dmc.AppShellNavbar:
                             rel="noopener noreferrer",
                             **{"aria-label": "Contacter l'auteur"},
                         ),
-                    ),
-                    html.Div(
-                        className="nav-tools",
-                        children=[
-                            dmc.Box(theme_toggle("color-scheme"), visibleFrom="sm"),
-                            dmc.ActionIcon(
-                                id="nav-collapse",
-                                variant="subtle",
-                                color="gray",
-                                size="lg",
-                                visibleFrom="sm",
-                                className="nav-collapse",
-                                n_clicks=0,
-                                children=[icon("panel-left-close", 18), icon("panel-left-open", 18)],
-                                **{"aria-label": "Replier / déplier le menu"},
-                            ),
-                        ],
                     ),
                 ],
             ),

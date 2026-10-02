@@ -12,7 +12,7 @@ plasma, projections) et sur l'analyse statistique du plan d'expériences Box-Beh
 | **Suivi & historique** | Verdict qualité de chaque soudure (OK / OK avec warning / NOK, d'après ses alarmes), campagne la plus récente en premier, filtres par verdict, courbe des alarmes dans l'ordre de production, détail d'une soudure et ouverture dans le monitoring. |
 | **Monitoring process** | Relecture d'une soudure (ralentie ×200) : lecteur avec lecture / pause et timeline des événements, cartes tir laser, intégrité (seuils franchis, anneau qui suit les seuils du verdict), puissance et vitesse, journal d'événements, courbes plasma / vitesse (bande ±10 %) / projections / cordon, enchaînement des soudures dans l'ordre réel. Tient sans défilement en plein écran 1920 × 1080. |
 | **Segmentation IA** | Annotation humaine à gauche, prédiction du U-Net ou carte des désaccords à droite, image par image. Métriques sur les vidéos d'évaluation, comparaison avec une baseline de vision classique. |
-| **Analyses** | Surfaces de réponse quadratiques, effets standardisés, effets principaux, carte de contrôle I-MR des résidus — à réévaluer au fil de la production. |
+| **Analyses** | Surfaces de réponse quadratiques, effets standardisés, effets principaux, carte de contrôle I-MR des résidus, à réévaluer au fil de la production. |
 | **Méthode & sources** | Chaîne de traitement, modèle de segmentation, statut de chaque signal (mesuré / consigne / calculé / modélisé), licence. |
 
 Navigation par barre latérale repliable (icônes seules), liens directs `#suivi`, `#process`, `#seg`, `#analyses`,
@@ -22,14 +22,14 @@ Navigation par barre latérale repliable (icônes seules), liens directs `#suivi
 jusqu'à 15, NOK au-delà ou dès qu'un écart de vitesse soutenu (±20 % pendant 5 ms) est détecté. Limites de
 vigilance des indicateurs : vitesse ±10 % de la consigne, instabilité au 90ᵉ centile des 81 soudures.
 
-## Ce que l'on montre — et ce que l'on ne prétend pas
+## Ce que l'on montre, et ce que l'on ne prétend pas
 
 Le dataset ne contient **aucun log capteur** : puissance et vitesse sont des consignes constantes par run. Le
 dashboard les affiche comme telles, entre l'allumage et l'extinction du laser, eux-mêmes détectés à l'image.
 Toutes les autres courbes sont **mesurées par vision** :
 
 - **Vitesse d'avance mesurée** : pente glissante de la position du front du cordon.
-- **Échelle px → mm** : déduite du procédé lui-même, un facteur par série car le cadrage change.
+- **Échelle pixels en mm** : déduite du procédé lui-même, un facteur par série car le cadrage change.
 - **Panache de plasma, projections et largeur de cordon** : issus de la segmentation de chaque frame.
 
 Résultats principaux :
@@ -44,13 +44,13 @@ Résultats principaux :
 
 ```
 data/          dataset Zenodo brut + intermédiaires (non versionné, ~11 Go)
-pipeline/      traitements hors ligne (GPU) — jamais embarqués dans l'image
-  01_extract → 02_metadata → 03_transcode → 04_labels → 05_train_seg → 06_infer
-  → 07_signals → 08_doe → 09_export
+pipeline/      traitements hors ligne (GPU), jamais embarqués dans l'image
+  01_extract, 02_metadata, 03_transcode, 04_labels, 05_train_seg, 06_infer,
+  07_signals, 08_doe, 09_export (dans cet ordre)
 models/        poids du U-Net + métriques (non versionné)
 app_data/      artefacts légers générés pour l'app (~170 Mo, non versionné, copié dans l'image)
 src/weldmon/app/
-  __init__.py  create_app() — mise en page, thème
+  __init__.py  create_app() : mise en page, thème
   security.py  en-têtes HTTP, routes /media, /overlay, /healthz
   data.py      accès lecture seule aux artefacts, liste blanche des runs
   theme.py     jetons clair / sombre, violet de l'interface, couleurs de classes validées (daltonisme, contraste)

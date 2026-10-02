@@ -1,4 +1,4 @@
-# Laser Welding Process Monitor — orchestration du pipeline et de l'image
+# Laser Welding Process Monitor : orchestration du pipeline et de l'image
 PY := uv run --group pipeline python
 IMAGE ?= ghcr.io/lenny-ai-data/laser-welding-monitor
 # Trivy épinglé par digest (outil de sécurité : jamais de tag flottant).

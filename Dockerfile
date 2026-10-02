@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1.7
-# Weld Process Monitor — image de production (app Dash + artefacts précalculés).
+# Weld Process Monitor : image de production (app Dash + artefacts précalculés).
 # Le pipeline (torch, données brutes, modèle) n'est jamais embarqué : seuls src/ et app_data/ le sont.
 
 ARG PYTHON_IMAGE=python:3.12-alpine@sha256:0687a6bc9716edc2a6ee0fbfb0f87e7ee358b262b67c9215de91bc9b2d38ba71
