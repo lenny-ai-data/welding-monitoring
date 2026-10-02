@@ -24,7 +24,7 @@ EXPLANATIONS = [
     point(
         "Le modèle IA",
         "un réseau de neurones (U-Net) a appris sur 6 de ces vidéos, puis a été testé sur les 2 qu'il n'avait "
-        "jamais vues (badge « évaluation ») : c'est le seul test honnête de ce qu'il sait faire.",
+        "jamais vues (badge « évaluation ») : ce sont elles qui mesurent ses performances réelles.",
     ),
     point(
         "Prédiction / Désaccords",
@@ -34,12 +34,12 @@ EXPLANATIONS = [
     point(
         "L'IoU (Intersection over Union)",
         "mesure le recouvrement entre la zone tracée par l'humain et celle trouvée par l'IA : 100 % = identique. "
-        "Les projections, qui ne font que quelques pixels, sont naturellement les plus difficiles.",
+        "Les projections, qui ne font que quelques pixels, sont les plus difficiles à délimiter.",
     ),
     point(
         "La baseline",
-        "une méthode classique sans IA (seuil de luminosité), mesurée sur les mêmes images : elle montre l'apport "
-        "réel du modèle.",
+        "une méthode classique sans IA (seuil de luminosité), mesurée sur les mêmes images, pour situer ce "
+        "qu'apporte le modèle.",
     ),
 ]
 
@@ -59,7 +59,7 @@ def run_options() -> list[dict]:
             items.append(
                 {
                     "value": run_id,
-                    "label": f"{run_id.replace('_', ' · essai ')} — "
+                    "label": f"{run_id.replace('_', ' · essai ')} · "
                     f"{r['power_w']:.0f} W · {r['feedrate_mm_s']:.0f} mm/s",
                 }
             )
@@ -79,7 +79,7 @@ def metric(label: str, value: str, sub: str = "") -> dmc.Paper:
 
 
 def pct(v: float | None) -> str:
-    return "—" if v is None else f"{100 * v:.0f} %".replace(".", ",")
+    return "-" if v is None else f"{100 * v:.0f} %".replace(".", ",")
 
 
 def metrics_block() -> html.Div:
@@ -87,7 +87,7 @@ def metrics_block() -> html.Div:
     ev, base = s["eval"], s["baseline"]
     sd = ev["spatter_detection"]
     rows = [
-        ("mIoU (3 classes)", pct(ev["miou"]), "—"),
+        ("mIoU (3 classes)", pct(ev["miou"]), "-"),
         ("IoU cordon", pct(ev["iou"]["weld"]), "non mesurable"),
         ("IoU plasma", pct(ev["iou"]["plasma"]), pct(base["iou"]["plasma"])),
         ("IoU projections", pct(ev["iou"]["spatter"]), pct(base["iou"]["spatter"])),
@@ -115,7 +115,7 @@ def metrics_block() -> html.Div:
                             html.Thead(
                                 html.Tr(
                                     [
-                                        html.Th("Métrique", style={"textAlign": "left"}),
+                                        html.Th("Métrique"),
                                         html.Th("U-Net", className="num"),
                                         html.Th("Baseline seuillage", className="num"),
                                     ]
@@ -134,11 +134,9 @@ def metrics_block() -> html.Div:
                     html.P(
                         className="muted small",
                         children=(
-                            f"U-Net · encodeur {s['model']['encoder']} · {str(s['model']['params_m']).replace('.', ',')} M paramètres · entrée "
-                            f"{s['model']['input']}. Entraîné sur {len(s['model']['train_runs'])} vidéos, checkpoint choisi "
-                            f"sur {', '.join(s['model']['val_runs'])}, évalué sur {', '.join(s['model']['eval_runs'])}. "
-                            f"Baseline : soustraction de la première frame + seuil ({base['threshold']} niveaux de gris) "
-                            "réglé sur les vidéos d'entraînement ; elle ne sait pas isoler le cordon."
+                            f"U-Net {s['model']['encoder']}, {str(s['model']['params_m']).replace('.', ',')} M paramètres, "
+                            f"entraîné sur {len(s['model']['train_runs'])} vidéos. Baseline : soustraction de la "
+                            f"première image et seuil à {base['threshold']} niveaux de gris, sans détection du cordon."
                         ),
                     ),
                 ],
@@ -291,13 +289,14 @@ def layout() -> html.Div:
                                 ],
                             ),
                             dmc.Paper(
-                                className="panel",
+                                className="panel seg-iou-panel",
                                 children=[
                                     html.H3("IoU par image (modèle vs annotation)", className="panel-title"),
                                     dcc.Graph(
                                         id="seg-iou",
+                                        className="graph-fill",
                                         config={"displayModeBar": False, "responsive": True},
-                                        style={"height": "290px"},
+                                        style={"height": "100%"},
                                     ),
                                 ],
                             ),

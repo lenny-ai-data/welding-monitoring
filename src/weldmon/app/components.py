@@ -66,4 +66,4 @@ def section_header(
 
 def point(title: str, text: str) -> html.P:
     """Paragraphe explicatif avec un intitulé en gras."""
-    return html.P([html.Strong(title + " — "), text])
+    return html.P([html.Strong(title + " : "), text])

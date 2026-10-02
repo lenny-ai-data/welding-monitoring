@@ -14,7 +14,7 @@
   const HOLD_MS = 3; // une alarme reste affichée 3 ms de procédé
   const nf = (v, d) =>
     v === null || v === undefined || Number.isNaN(v)
-      ? "—"
+      ? "-"
       : Number(v)
           .toLocaleString("fr-FR", { minimumFractionDigits: d, maximumFractionDigits: d })
           .replace(/\u202f/g, "\u00a0"); // espace fine absente de la police Sora
@@ -65,7 +65,7 @@
     seekTo((e.clientX - box.left) / box.width);
   }
 
-  // Vitesse de lecture : ½× → 1× → 2× (bouton unique, compact).
+  // Vitesse de lecture : ½×, 1×, 2× (bouton unique, compact).
   const RATES = [0.5, 1, 2];
   function cycleRate(btn) {
     state.rate = RATES[(RATES.indexOf(state.rate) + 1) % RATES.length];
@@ -187,7 +187,7 @@
       [String(total), plasma + " plasma · " + bursts + " projections · " + speedDev + " vitesse", ring(total / L.warn_max, integrityColor)],
       [on ? nf(p.setpoint.power, 0) : "0", on ? "consigne" : "laser coupé", ring(on ? 1 : 0, c.ring)],
       [
-        speed != null ? nf(speed, 0) : "—",
+        speed != null ? nf(speed, 0) : "-",
         dev != null ? (dev >= 0 ? "+" : "−") + nf(Math.abs(dev), 0) + " % / consigne" : on ? "mesure en cours" : "à l'arrêt",
         ring(rSpeed, ringColor(c, rSpeed, speedAlarm)),
       ],
