@@ -450,21 +450,12 @@ body {
   margin: 0 auto;
   padding: 8px 10px 0;
 }
-/* Canevas : sur grand écran, les pages sont dessinées pour 1920 × 1080 (contenu de 1648 px de large)
-   puis mises à l'échelle d'un bloc (transform, que Plotly sait compenser pour le survol ; --fit, --cx et
-   la hauteur réservée sont calculés dans nav.js). Les proportions restent identiques en plein écran, en
-   fenêtre ou sur un écran plus grand, sans barre de défilement. */
+/* Grand écran : l'application est pensée pour le plein écran 1920 × 1080. Le contenu garde la largeur
+   de cette référence (1648 px, centré au-delà) et toutes les proportions découlent de la largeur : une
+   fenêtre moins haute fait simplement défiler la page, à taille réelle. */
 @media (min-width: 1200px) {
-  .canvas {
-    height: var(--canvas-h, auto);
-    overflow: hidden;
-  }
   .sections {
-    width: 1648px;
-    max-width: none;
-    margin: 0;
-    transform: translateX(var(--cx, 0px)) scale(var(--fit, 1));
-    transform-origin: top left;
+    max-width: 1648px;
   }
 }
 .section-header {
@@ -1273,7 +1264,7 @@ body {
 .chart-row .graph-fill {
   height: 170px !important;
 }
-@media (min-width: 1200px) and (min-height: 760px) {
+@media (min-width: 1200px) {
   .chart-plasma {
     flex: 1.35 1 0;
     min-height: 200px;

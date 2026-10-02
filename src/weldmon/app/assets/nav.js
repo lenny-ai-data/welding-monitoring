@@ -51,40 +51,6 @@
     }
   }
 
-  // Mise à l'échelle du canevas (voir .canvas / .sections dans style.css) : référence 1920 × 1080,
-  // barre dépliée. La hauteur réservée suit le contenu (bandeau d'explications ouvert, changement de page).
-  const DESIGN = { width: 1920 - WIDTH.expanded - 32, height: 1080 - 32 }; // hors marges de l'AppShell (16 px)
-  let observer = null;
-  function applyFit() {
-    const root = document.documentElement;
-    const canvas = document.getElementById("canvas");
-    const content = canvas && canvas.firstElementChild;
-    if (!canvas || !content) return;
-    let fit = 1;
-    let cx = 0;
-    if (window.innerWidth >= 1200) {
-      const nav = collapsed ? WIDTH.collapsed : WIDTH.expanded;
-      fit = Math.min((window.innerHeight - 32) / DESIGN.height, (window.innerWidth - nav - 32) / DESIGN.width);
-      cx = Math.max(0, (canvas.clientWidth - DESIGN.width * fit) / 2);
-      root.style.setProperty("--canvas-h", Math.ceil(content.offsetHeight * fit) + "px");
-    } else {
-      root.style.removeProperty("--canvas-h");
-    }
-    root.style.setProperty("--fit", fit.toFixed(4));
-    root.style.setProperty("--cx", cx.toFixed(1) + "px");
-    if (!observer && window.ResizeObserver) {
-      observer = new ResizeObserver(() => scheduleFit());
-      observer.observe(content);
-      observer.observe(canvas);
-    }
-  }
-  let fitFrame = null;
-  function scheduleFit() {
-    if (fitFrame) window.cancelAnimationFrame(fitFrame);
-    fitFrame = window.requestAnimationFrame(applyFit);
-  }
-  window.addEventListener("resize", scheduleFit);
-
   window.dash_clientside = Object.assign({}, window.dash_clientside, {
     nav: {
       route: function (_clicks, burgerOpened, _collapseClicks, goto, navbar) {
@@ -112,7 +78,6 @@
           if (v && !v.paused) v.pause();
         }
 
-        scheduleFit();
         const styles = KEYS.map((k) => (k === current ? {} : { display: "none" }));
         const nav = Object.assign({}, navbar, {
           width: collapsed ? WIDTH.collapsed : WIDTH.expanded,
