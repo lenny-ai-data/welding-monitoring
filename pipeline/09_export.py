@@ -32,6 +32,13 @@ DATASET = {
     "prédictions d'un modèle de segmentation et indicateurs dérivés ajoutés.",
 }
 
+# Verdict qualité d'une soudure, à partir de ses alarmes (pics de plasma + rafales de projections).
+# Un écart de vitesse soutenu (alarme vitesse) rend la soudure NOK quel que soit le reste.
+VERDICT_OK_MAX = 10  # jusqu'à 10 alarmes : OK
+VERDICT_WARN_MAX = 15  # de 11 à 15 : OK avec warning ; au-delà : NOK
+SPEED_WARN_PCT = 10  # zone de vigilance sur la vitesse (l'alarme reste à ±20 % pendant 5 ms)
+STABILITY_QUANTILE = 0.90  # limite d'instabilité : 90e centile du CV plasma (laser ON, 81 runs)
+
 
 def clean(v):
     if isinstance(v, float | np.floating):
@@ -43,6 +50,20 @@ def clean(v):
     if isinstance(v, pd.Timestamp):
         return v.isoformat()
     return v
+
+
+def verdict(rec: dict) -> str:
+    if rec["n_speed_deviation"] or rec["n_alarms"] > VERDICT_WARN_MAX:
+        return "nok"
+    return "ok" if rec["n_alarms"] <= VERDICT_OK_MAX else "warn"
+
+
+def stability_limit() -> float:
+    cv = []
+    for f in (PROCESSED / "ts").glob("*.json"):
+        ts = json.loads(f.read_text())
+        cv += [c for c, on in zip(ts["plasma_cv"], ts["on"], strict=True) if on and c is not None]
+    return round(float(np.quantile(cv, STABILITY_QUANTILE)), 3)
 
 
 def export_runs() -> list[dict]:
@@ -57,6 +78,8 @@ def export_runs() -> list[dict]:
         rec["slowmo"] = rec["fps"] // PLAYBACK_FPS
         # Le modèle n'a vu que des images DoE3 : DoE1 / DoE2 (éclairage, cadrage) sont hors domaine.
         rec["in_domain"] = rec["serie"] == "DoE3"
+        rec["n_alarms"] = rec["n_plasma_spike"] + rec["n_spatter_burst"]
+        rec["verdict"] = verdict(rec)
         rec.pop("camera", None)
         records.append(rec)
     return records
@@ -111,6 +134,13 @@ def main() -> None:
         "dataset": DATASET,
         "playback_fps": PLAYBACK_FPS,
         "camera": "Photron FASTCAM Nova S9, 1024×1024, mono 8 bits",
+        "quality": {
+            "verdict_ok_max_alarms": VERDICT_OK_MAX,
+            "verdict_warn_max_alarms": VERDICT_WARN_MAX,
+            "speed_warn_pct": SPEED_WARN_PCT,
+            "stability_limit_cv": stability_limit(),
+            "stability_quantile": STABILITY_QUANTILE,
+        },
     }
     (APP_DATA / "meta.json").write_text(json.dumps(meta, indent=2, ensure_ascii=False))
     size = sum(p.stat().st_size for p in APP_DATA.rglob("*") if p.is_file()) / 1e6
