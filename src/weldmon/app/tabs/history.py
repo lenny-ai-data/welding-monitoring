@@ -18,19 +18,18 @@ FILTERS = [("all", "Soudures contrôlées", "layout-grid"), *((k, lbl, ic) for k
 EXPLANATIONS = [
     point(
         "Ce que montre cette page",
-        "les 81 soudures du jeu de données, présentées comme le suivi d'une production : trois campagnes "
-        "réalisées entre juin et juillet 2024, la plus récente en haut.",
+        "les 81 soudures réalisées à travers trois campagnes entre juin et juillet 2024.",
     ),
     point(
-        "Le verdict",
-        "chaque soudure reçoit un verdict à partir des alarmes détectées par l'IA pendant le soudage (pics de "
+        "Evaluation",
+        "chaque soudure reçoit un avis qualité à partir des alarmes détectées par IA pendant le soudage (pics de "
         "plasma, rafales de projections) : OK jusqu'à 10 alarmes, OK avec warning jusqu'à 15, NOK au-delà. Un "
         "écart de vitesse soutenu rend la soudure NOK dans tous les cas.",
     ),
     point(
         "Filtrer et explorer",
-        "les cartes du haut filtrent la grille ; un clic sur un essai (ou sur un point de la courbe) affiche son "
-        "détail, et le bouton « Ouvrir dans Monitoring process » rejoue la soudure image par image.",
+        "les cartes du haut filtrent la grille, un clic sur un essai (ou sur un point de la courbe) affiche son "
+        "détail.",
     ),
 ]
 
@@ -132,8 +131,7 @@ def layout() -> html.Div:
         children=[
             section_header(
                 "Suivi & historique",
-                "Les 81 soudures du jeu de données suivies comme une production : verdict qualité de chaque "
-                "soudure, campagne la plus récente en premier.",
+                "Vision globale de l'ensemble des campagnes de soudures avec avis qualité pour chacune.",
                 EXPLANATIONS,
             ),
             summary_cards(),

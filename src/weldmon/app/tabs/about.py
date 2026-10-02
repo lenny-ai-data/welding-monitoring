@@ -9,8 +9,7 @@ from ..components import point, section_header
 EXPLANATIONS = [
     point(
         "Des données réelles",
-        "ce démonstrateur rejoue une campagne d'essais publiée par l'Université de Skövde (Suède). Une grandeur "
-        "qui n'a pas été mesurée (la puissance laser) est affichée comme consigne.",
+        "ce démonstrateur rejoue une campagne d'essais publiée par l'Université de Skövde (Suède).",
     ),
     point(
         "Tout est calculé en amont",
@@ -98,7 +97,7 @@ def model_panel() -> html.Div:
             html.H3("Modèle de segmentation", className="panel-title"),
             html.P(
                 "Un réseau de neurones repère, sur chaque image, le cordon, le plasma et les projections. Découpage "
-                "par vidéo pour éviter toute fuite entre images voisines ; le modèle tourne hors ligne (GPU), "
+                "par vidéo pour éviter toute fuite entre images voisines. Le modèle tourne hors ligne (GPU), "
                 "l'application ne sert que les résultats."
             ),
             html.Dl([item for k, v in rows for item in (html.Dt(k), html.Dd(v))], className="params-grid model-grid"),
@@ -178,7 +177,7 @@ def layout() -> html.Div:
                             html.A(ds["doi"], href=ds["url"], target="_blank", rel="noopener noreferrer"),
                             ". Licence ",
                             html.A(ds["license"], href=ds["license_url"], target="_blank", rel="noopener noreferrer"),
-                            " : usage non commercial, attribution requise.",
+                            ".",
                         ]
                     ),
                     html.P(["Modifications : ", ds["changes"]], className="muted small"),

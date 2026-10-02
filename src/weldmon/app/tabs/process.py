@@ -17,40 +17,25 @@ DEFAULT_RUN = "DoE3_19"
 EXPLANATIONS = [
     point(
         "Ce que vous voyez",
-        "une soudure laser réelle filmée par une caméra ultra-rapide (6 000 à 9 000 images par seconde). Une "
+        "une soudure laser filmée par une caméra ultra-rapide (6 000 à 9 000 images/s). Une "
         "soudure complète dure moins de 0,15 seconde : elle est rejouée environ 200 fois plus lentement, avec "
         "les mesures que l'IA en extrait image par image.",
     ),
     point(
-        "Tir laser",
-        "indique d'un coup d'œil si le laser tire à l'instant affiché (« Tir en cours ») ou non (« À l'arrêt »).",
+        "Les masques IA",
+        "un modèle d'IA repère sur chaque image le cordon de soudure, le panache "
+        "de plasma (la vapeur de métal au-dessus du point de soudage) et les projections de "
+        "métal fondu.",
     ),
     point(
         "Intégrité",
-        "compte les seuils franchis depuis l'allumage : pics de plasma, rafales de projections, écarts de "
-        "vitesse. L'anneau va de 0 à 15 et suit les seuils du verdict : violet jusqu'à 10 (OK), doré jusqu'à 15 "
-        "(OK avec warning), rouge au-delà ou dès un écart de vitesse (NOK).",
-    ),
-    point(
-        "Puissance et vitesse",
-        "consigne de puissance et vitesse d'avance mesurée à l'image. L'anneau de vitesse montre l'écart à la "
-        "consigne : il vire au doré à l'approche de ±10 % et au rouge en cas d'alarme (±20 % pendant 5 ms).",
-    ),
-    point(
-        "Les masques IA",
-        "un modèle d'intelligence artificielle repère sur chaque image le cordon de soudure (violet), le panache "
-        "de plasma (orange), c'est-à-dire la vapeur de métal ionisée au-dessus du point de soudage, et les projections de "
-        "métal fondu (magenta). Le bouton en haut à droite de la vidéo les masque.",
+        "compte les seuils d'alerte franchis : pics de plasma, rafales de projections, écarts de "
+        "vitesse. OK jusqu'à 10 (OK), OK avec warning jusqu'à 15, NOK au-delà.",
     ),
     point(
         "Les courbes",
-        "en pointillés, les consignes et les seuils ; en violet, ce qui est mesuré à l'image. Les pics de plasma "
-        "(▲), les rafales de projections (◆) et les écarts de vitesse (▼) sont marqués là où ils se produisent, "
-        "et la timeline du lecteur les situe dans la soudure.",
-    ),
-    point(
-        "Enchaîner",
-        "activé, le lecteur passe automatiquement à la soudure suivante, dans l'ordre réel de production.",
+        "en pointillés, les consignes et les seuils. En violet ce qui est mesuré à l'image. Les pics de plasma "
+        "(▲), les rafales de projections (◆) et les écarts de vitesse (▼) sont marqués là où ils se produisent.",
     ),
 ]
 
@@ -268,16 +253,9 @@ def layout() -> html.Div:
         children=[
             section_header(
                 "Monitoring process",
-                "Relecture d'une soudure réelle filmée à 6 000 images/s et ralentie 200 fois, avec ses signaux de "
-                "procédé et l'analyse de l'IA image par image.",
+                "Evaluation d'une soudure filmée à 6 000 images/s et ralentie 200 fois, avec ses signaux de "
+                "procédé et une analyse d'images par IA.",
                 EXPLANATIONS,
-                crumb=[
-                    html.Button(
-                        "Suivi & historique", id="crumb-suivi", n_clicks=0, type="button", className="crumb-link"
-                    ),
-                    html.Span(" / "),
-                    html.Span(id="proc-crumb-run"),
-                ],
                 aside=[
                     html.Div(id="proc-verdict"),
                     dmc.Select(
@@ -291,7 +269,7 @@ def layout() -> html.Div:
                         comboboxProps={"withinPortal": True},
                         **{"aria-label": "Soudure à rejouer"},
                     ),
-                    dmc.Switch(id="prod-mode", label="Enchaîner", checked=True, size="sm"),
+                    dmc.Switch(id="prod-mode", label="Lecture auto", checked=True, size="sm"),
                 ],
             ),
             html.Div(
@@ -517,24 +495,6 @@ def params_table(run: dict) -> list:
             f"à {run['recorded_at'][11:16]}",
         ),
     ]
-    badges = []
-    if run.get("front_fit_r2") is not None and run["front_fit_r2"] < 0.9:
-        badges.append(
-            dmc.Tooltip(
-                label="La position du front du cordon est mal suivie sur ce run (ajustement R² < 0,9) : "
-                "la vitesse mesurée y est indicative.",
-                multiline=True,
-                w=280,
-                withArrow=True,
-                children=dmc.Badge("Suivi du front dégradé", variant="outline", color="yellow", size="sm"),
-            )
-        )
-    if run["split"]:
-        badges.append(
-            dmc.Badge(
-                "Annoté · " + ("évaluation" if run["split"] == "eval" else "entraînement"), variant="light", size="sm"
-            )
-        )
     return [
         html.Div(
             [
@@ -542,7 +502,6 @@ def params_table(run: dict) -> list:
                     f"{run['serie']} · essai {run['point']} · {run['exec_rank']}ᵉ soudure de la campagne",
                     className="panel-title",
                 ),
-                *badges,
             ],
             className="params-head",
         ),
@@ -554,7 +513,6 @@ def params_table(run: dict) -> list:
     Output("live-data", "data"),
     Output("run-params", "children"),
     Output("proc-verdict", "children"),
-    Output("proc-crumb-run", "children"),
     Input("run-select", "value"),
     Input("color-scheme", "computedColorScheme"),
 )
@@ -565,7 +523,6 @@ def load_run(run_id, scheme):
         live_payload(run_id, scheme),
         params_table(run),
         verdict_badge(run["verdict"], "Soudure "),
-        f"{run['serie']} · essai {run['point']}",
     )
 
 

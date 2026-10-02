@@ -14,32 +14,22 @@ EXPLANATIONS = [
     point(
         "La segmentation",
         "consiste à attribuer chaque pixel d'une image à une catégorie. Ici trois : le cordon de soudure "
-        "(violet), le panache de plasma (orange) et les projections de métal fondu (magenta).",
-    ),
-    point(
-        "L'annotation humaine",
-        "sur 8 vidéos, des chercheurs ont délimité ces zones image par image (164 images par vidéo), aidés de "
-        "l'outil SAM2 puis en corrigeant à la main. C'est la « vérité terrain » qui sert de référence.",
+        ", le panache de plasma et les projections de métal fondu.",
     ),
     point(
         "Le modèle IA",
         "un réseau de neurones (U-Net) a appris sur 6 de ces vidéos, puis a été testé sur les 2 qu'il n'avait "
-        "jamais vues (badge « évaluation ») : ce sont elles qui mesurent ses performances réelles.",
+        "jamais vues : ce sont elles qui mesurent ses performances réelles.",
     ),
     point(
         "Prédiction / Désaccords",
-        "à gauche l'annotation humaine ; à droite, au choix, la prédiction du modèle ou, en rouge, les seuls "
-        "pixels où les deux divergent. Le bouton « Lecture » fait défiler les images.",
+        "à gauche l'annotation humaine, délimitée par des experts. C'est la « vérité terrain » qui sert de référence. "
+        "A droite, au choix, la prédiction du modèle ou, en rouge, les zones où les deux divergent.",
     ),
     point(
         "L'IoU (Intersection over Union)",
-        "mesure le recouvrement entre la zone tracée par l'humain et celle trouvée par l'IA : 100 % = identique. "
+        "mesure le recouvrement entre la zone tracée par l'humain et celle trouvée par IA. "
         "Les projections, qui ne font que quelques pixels, sont les plus difficiles à délimiter.",
-    ),
-    point(
-        "La baseline",
-        "une méthode classique sans IA (seuil de luminosité), mesurée sur les mêmes images, pour situer ce "
-        "qu'apporte le modèle.",
     ),
 ]
 
@@ -103,9 +93,7 @@ def metrics_block() -> html.Div:
             dmc.Paper(
                 className="panel seg-table",
                 children=[
-                    html.H3(
-                        "Modèle U-Net vs vision classique (seuillage), vidéos d'évaluation", className="panel-title"
-                    ),
+                    html.H3("Modèle U-Net vs vision classique par seuillage", className="panel-title"),
                     dmc.Table(
                         striped=False,
                         highlightOnHover=True,
@@ -132,10 +120,10 @@ def metrics_block() -> html.Div:
                         ],
                     ),
                     html.P(
-                        className="muted small",
+                        className="muted small pre-line",
                         children=(
                             f"U-Net {s['model']['encoder']}, {str(s['model']['params_m']).replace('.', ',')} M paramètres, "
-                            f"entraîné sur {len(s['model']['train_runs'])} vidéos. Baseline : soustraction de la "
+                            f"entraîné sur {len(s['model']['train_runs'])} vidéos.\nBaseline : soustraction de la "
                             f"première image et seuil à {base['threshold']} niveaux de gris, sans détection du cordon."
                         ),
                     ),
@@ -152,8 +140,8 @@ def layout() -> html.Div:
         className="tab-body",
         children=[
             section_header(
-                "Segmentation IA",
-                "Comment l'IA « voit » une soudure : son analyse comparée, image par image, à celle d'experts humains.",
+                "Segmentation par IA",
+                "Evaluation du modèle de segmentation des éléments d'une soudure : son évaluation passe par une comparaison avec une segmentation manuelle réalisée par des experts.",
                 EXPLANATIONS,
             ),
             html.Div(

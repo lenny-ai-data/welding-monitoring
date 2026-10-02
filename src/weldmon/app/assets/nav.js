@@ -3,8 +3,8 @@
 (function () {
   "use strict";
 
-  const KEYS = ["suivi", "process", "seg", "analyses", "about"]; // même ordre que SECTIONS (app/__init__.py)
-  const DEFAULT = "suivi"; // = DEFAULT_SECTION
+  const KEYS = ["process", "suivi", "analyses", "seg", "about"]; // même ordre que SECTIONS (app/__init__.py)
+  const DEFAULT = "process"; // = DEFAULT_SECTION
   const WIDTH = { expanded: 240, collapsed: 72 }; // = NAV_WIDTH
   const STORAGE_KEY = "weldmon-nav-collapsed";
   let current = null;
@@ -53,7 +53,7 @@
 
   window.dash_clientside = Object.assign({}, window.dash_clientside, {
     nav: {
-      route: function (_clicks, burgerOpened, _collapseClicks, goto, _crumb, navbar) {
+      route: function (_clicks, burgerOpened, _collapseClicks, goto, navbar) {
         const ctx = window.dash_clientside.callback_context;
         const trig = ctx && ctx.triggered_id;
         let opened = Boolean(burgerOpened);
@@ -70,8 +70,6 @@
         } else if (trig === "goto" && goto && KEYS.includes(goto.section)) {
           go(goto.section);
           playIfLoaded(goto.run);
-        } else if (trig === "crumb-suivi") {
-          go("suivi");
         }
 
         // Quitter le monitoring met la vidéo en pause (pas de lecture invisible en arrière-plan).
@@ -86,7 +84,7 @@
           collapsed: Object.assign({}, (navbar && navbar.collapsed) || {}, { mobile: !opened }),
         });
         // Les graphes Plotly suivent la nouvelle largeur du contenu.
-        window.setTimeout(() => window.dispatchEvent(new Event("resize")), 250);
+        window.setTimeout(() => window.dispatchEvent(new Event("resize")), 280); // après la transition (240 ms)
         return [
           ...styles,
           KEYS.map((k) => k === current),
