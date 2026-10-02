@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+.venv
+.pytest_cache/
+.ruff_cache/
+
+# Données brutes et intermédiaires (dataset Zenodo, ~11 Go) — jamais versionnées
+data/
+# Artefacts générés par le pipeline (embarqués dans l'image Docker, pas dans git)
+app_data/
+models/
+*.mp4
+*.avi
+
+# Divers
+.env
+.DS_Store
