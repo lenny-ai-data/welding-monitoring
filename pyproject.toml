@@ -41,11 +41,15 @@ build-backend = "hatchling.build"
 packages = ["src/weldmon"]
 
 [tool.ruff]
-line-length = 100
+line-length = 120
 target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.ruff.lint.per-file-ignores]
+# Mises en page Dash très imbriquées : les textes d'interface priment sur la longueur de ligne.
+"src/weldmon/app/tabs/*.py" = ["E501"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
