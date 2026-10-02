@@ -27,9 +27,9 @@ EXPLANATIONS = [
         "jamais vues (badge « évaluation ») : c'est le seul test honnête de ce qu'il sait faire.",
     ),
     point(
-        "Côte à côte / Désaccords",
-        "comparez l'annotation (à gauche) et la prédiction (à droite), ou n'affichez en rouge que les pixels où "
-        "les deux divergent. Le bouton « Lecture » fait défiler les images.",
+        "Prédiction / Désaccords",
+        "à gauche l'annotation humaine ; à droite, au choix, la prédiction du modèle ou, en rouge, les seuls "
+        "pixels où les deux divergent. Le bouton « Lecture » fait défiler les images.",
     ),
     point(
         "L'IoU (Intersection over Union)",
@@ -82,25 +82,12 @@ def pct(v: float | None) -> str:
     return "—" if v is None else f"{100 * v:.0f} %".replace(".", ",")
 
 
-def metric_cards() -> html.Div:
-    ev = data.seg()["eval"]
-    sd = ev["spatter_detection"]
-    return html.Div(
-        className="kpi-row kpi-row-4 seg-metrics",
-        children=[
-            metric("mIoU (3 classes)", pct(ev["miou"]), "2 vidéos d'évaluation"),
-            metric("IoU cordon", pct(ev["iou"]["weld"]), "recouvrement"),
-            metric("IoU plasma", pct(ev["iou"]["plasma"]), "recouvrement"),
-            metric("Projections détectées", pct(sd["recall"]), f"précision {pct(sd['precision'])}"),
-        ],
-    )
-
-
 def metrics_block() -> html.Div:
     s = data.seg()
     ev, base = s["eval"], s["baseline"]
     sd = ev["spatter_detection"]
     rows = [
+        ("mIoU (3 classes)", pct(ev["miou"]), "—"),
         ("IoU cordon", pct(ev["iou"]["weld"]), "non mesurable"),
         ("IoU plasma", pct(ev["iou"]["plasma"]), pct(base["iou"]["plasma"])),
         ("IoU projections", pct(ev["iou"]["spatter"]), pct(base["iou"]["spatter"])),
@@ -114,18 +101,21 @@ def metrics_block() -> html.Div:
     return html.Div(
         [
             dmc.Paper(
-                className="panel",
-                mt="md",
+                className="panel seg-table",
                 children=[
-                    html.H3("Modèle U-Net vs vision classique (seuillage)", className="panel-title"),
+                    html.H3(
+                        "Modèle U-Net vs vision classique (seuillage), vidéos d'évaluation", className="panel-title"
+                    ),
                     dmc.Table(
                         striped=False,
                         highlightOnHover=True,
+                        verticalSpacing=4,
+                        fz="sm",
                         children=[
                             html.Thead(
                                 html.Tr(
                                     [
-                                        html.Th("Métrique (évaluation)"),
+                                        html.Th("Métrique", style={"textAlign": "left"}),
                                         html.Th("U-Net", className="num"),
                                         html.Th("Baseline seuillage", className="num"),
                                     ]
@@ -168,36 +158,50 @@ def layout() -> html.Div:
                 "Comment l'IA « voit » une soudure : son analyse comparée, image par image, à celle d'experts humains.",
                 EXPLANATIONS,
             ),
-            dmc.Grid(
-                gutter="md",
+            html.Div(
+                className="seg-grid",
                 children=[
-                    dmc.GridCol(
-                        span={"base": 12, "lg": 7},
+                    html.Div(
+                        className="seg-left",
                         children=[
                             dmc.Paper(
                                 className="panel",
                                 children=[
-                                    dmc.Group(
-                                        justify="space-between",
-                                        align="flex-end",
-                                        wrap="wrap",
-                                        gap="sm",
+                                    html.Div(
+                                        className="seg-toolbar",
                                         children=[
                                             dmc.Select(
                                                 id="seg-run",
-                                                label="Vidéo annotée",
                                                 data=run_options(),
                                                 value=default,
                                                 allowDeselect=False,
-                                                w="100%",
-                                                maw=340,
+                                                w=330,
+                                                **{"aria-label": "Vidéo annotée"},
+                                            ),
+                                            dmc.ChipGroup(
+                                                id="seg-classes",
+                                                multiple=True,
+                                                value=["w", "p", "s"],
+                                                children=html.Div(
+                                                    [
+                                                        dmc.Chip(
+                                                            label,
+                                                            value=key,
+                                                            size="xs",
+                                                            variant="light",
+                                                            color=CHIP_COLORS[name],
+                                                        )
+                                                        for key, name, label in CLASSES
+                                                    ],
+                                                    className="seg-chips",
+                                                ),
                                             ),
                                             dmc.SegmentedControl(
                                                 id="seg-view",
-                                                value="compare",
+                                                value="pred",
                                                 size="xs",
                                                 data=[
-                                                    {"value": "compare", "label": "Côte à côte"},
+                                                    {"value": "pred", "label": "Prédiction"},
                                                     {"value": "diff", "label": "Désaccords"},
                                                 ],
                                             ),
@@ -218,8 +222,25 @@ def layout() -> html.Div:
                                                 id="seg-fig-b",
                                                 className="seg-fig",
                                                 children=[
-                                                    html.Img(id="seg-img-b", alt="Prédiction du modèle"),
+                                                    html.Img(id="seg-img-b", alt="Prédiction du modèle ou désaccords"),
                                                     html.Figcaption(id="seg-cap-b"),
+                                                ],
+                                            ),
+                                            html.Div(
+                                                className="seg-opacity",
+                                                children=[
+                                                    html.Span("Opacité"),
+                                                    dmc.Slider(
+                                                        id="seg-alpha",
+                                                        min=10,
+                                                        max=90,
+                                                        step=5,
+                                                        value=55,
+                                                        size="xs",
+                                                        w=110,
+                                                        label=None,
+                                                        **{"aria-label": "Opacité des masques"},
+                                                    ),
                                                 ],
                                             ),
                                         ],
@@ -250,44 +271,13 @@ def layout() -> html.Div:
                                             ),
                                         ],
                                     ),
-                                    dmc.Group(
-                                        justify="space-between",
-                                        wrap="wrap",
-                                        mt="sm",
-                                        children=[
-                                            dmc.ChipGroup(
-                                                id="seg-classes",
-                                                multiple=True,
-                                                value=["w", "p", "s"],
-                                                children=[
-                                                    dmc.Chip(
-                                                        label,
-                                                        value=key,
-                                                        size="xs",
-                                                        variant="light",
-                                                        color=CHIP_COLORS[name],
-                                                    )
-                                                    for key, name, label in CLASSES
-                                                ],
-                                            ),
-                                            html.Div(
-                                                style={"width": "200px"},
-                                                children=[
-                                                    html.Div("Opacité des masques", className="kpi-label"),
-                                                    dmc.Slider(
-                                                        id="seg-alpha", min=10, max=90, step=5, value=55, size="xs"
-                                                    ),
-                                                ],
-                                            ),
-                                        ],
-                                    ),
                                 ],
                             ),
-                            metric_cards(),
+                            metrics_block(),
                         ],
                     ),
-                    dmc.GridCol(
-                        span={"base": 12, "lg": 5},
+                    html.Div(
+                        className="seg-right",
                         children=[
                             dmc.Paper(
                                 className="panel",
@@ -296,19 +286,18 @@ def layout() -> html.Div:
                                     dcc.Graph(
                                         id="seg-areas",
                                         config={"displayModeBar": False, "responsive": True},
-                                        style={"height": "420px"},
+                                        style={"height": "440px"},
                                     ),
                                 ],
                             ),
                             dmc.Paper(
                                 className="panel",
-                                mt="md",
                                 children=[
-                                    html.H3("IoU par frame (modèle vs annotation)", className="panel-title"),
+                                    html.H3("IoU par image (modèle vs annotation)", className="panel-title"),
                                     dcc.Graph(
                                         id="seg-iou",
                                         config={"displayModeBar": False, "responsive": True},
-                                        style={"height": "220px"},
+                                        style={"height": "290px"},
                                     ),
                                 ],
                             ),
@@ -316,7 +305,6 @@ def layout() -> html.Div:
                     ),
                 ],
             ),
-            metrics_block(),
             dcc.Store(id="seg-figs"),
             dcc.Interval(id="seg-tick", interval=120, disabled=True),
         ],
@@ -359,7 +347,7 @@ def area_figs(run_id: str, scheme: str | None) -> dict:
             "font": {"color": t["text2"]},
         },
     )
-    layout["xaxis"] = theme.axis(t, title={"text": "Temps de procédé (ms)"}, anchor=f"y{n}")
+    layout["xaxis"] = theme.xaxis(t, title={"text": "Temps de procédé (ms)"}, anchor=f"y{n}")
     annotations = []
     for i, (_, name, label) in enumerate(CLASSES, start=1):
         top = 0.93 - 0.93 * (i - 1) / n
@@ -417,7 +405,7 @@ def area_figs(run_id: str, scheme: str | None) -> dict:
         hovermode="x unified",
         legend={"orientation": "h", "y": 1.02, "yanchor": "bottom", "x": 0, "font": {"color": t["text2"]}},
     )
-    iou_layout["xaxis"] = theme.axis(t, title={"text": "Temps de procédé (ms)"})
+    iou_layout["xaxis"] = theme.xaxis(t, title={"text": "Temps de procédé (ms)"})
     iou_layout["yaxis"] = theme.axis(t, range=[0, 1.05], tickformat=".0%", nticks=4, fixedrange=True)
     # Moyenne glissante sur 9 frames annotées (~36 frames caméra) : l'IoU d'objets minuscules
     # (projections) varie trop d'une frame à l'autre pour être lisible brute.

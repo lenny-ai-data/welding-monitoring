@@ -25,8 +25,11 @@ def verdict_badge(verdict: str, prefix: str = "") -> html.Span:
     return html.Span([icon(icon_name, 15), prefix + label], className=f"verdict-badge v-{verdict}")
 
 
-def section_header(title: str, subtitle: str, explanations: list, crumb=None, aside=None) -> html.Div:
-    """Titre de section (+ fil d'Ariane et éléments à droite) + bandeau « Infos et explications » replié."""
+def section_header(
+    title: str, subtitle: str, explanations: list, crumb=None, aside=None, opened: bool = False
+) -> html.Div:
+    """Titre de section (+ fil d'Ariane et éléments à droite) + bandeau « Infos et explications »,
+    replié par défaut."""
     return html.Div(
         className="section-header",
         children=[
@@ -42,7 +45,7 @@ def section_header(title: str, subtitle: str, explanations: list, crumb=None, as
                 ],
             ),
             dmc.Accordion(
-                value=None,
+                value="info" if opened else None,
                 variant="separated",
                 radius="md",
                 chevronPosition="right",

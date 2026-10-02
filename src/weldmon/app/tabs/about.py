@@ -28,7 +28,7 @@ EXPLANATIONS = [
 PIPELINE = [
     ("Acquisition", "81 vidéos Photron 6 000–9 000 im/s, plan Box-Behnken 4 facteurs × 3 séries"),
     ("Annotation", "8 vidéos annotées (SAM2 + relecture humaine) : cordon, plasma, projections"),
-    ("Modèle IA", "U-Net entraîné sur 6 vidéos, évalué sur 2 vidéos jamais vues"),
+    ("Modèle IA", "U-Net entraîné sur 6 vidéos (dont 1 de validation), évalué sur 2 vidéos jamais vues"),
     ("Inférence", "59 830 frames segmentées, mesures géométriques par frame"),
     ("Signaux & KPI", "étalonnage px → mm, détection ON/OFF, vitesse, stabilité, alarmes"),
     ("Suivi & analyses", "verdict par soudure, surfaces de réponse, effets, cartes de contrôle"),
@@ -51,15 +51,101 @@ SIGNALS = [
         "Pics de plasma > médiane + 3σ (robuste), rafales de projections (quantile 99 % "
         "du dataset), écart de vitesse > 20 % pendant au moins 5 ms.",
     ),
+    (
+        "Verdict d'une soudure",
+        "Calculé",
+        "OK jusqu'à 10 alarmes, OK avec warning jusqu'à 15, NOK au-delà ou dès un écart de vitesse soutenu.",
+    ),
     ("Surfaces de réponse", "Modélisé", "Modèle quadratique complet + effet de série, ajusté sur les 81 runs."),
 ]
 
 BADGE_COLOR = {"Mesuré": "teal", "Mesuré (IA)": "grape", "Consigne": "gray", "Calculé": "orange", "Modélisé": "indigo"}
 
 
+def pct(v: float) -> str:
+    return f"{100 * v:.0f} %"
+
+
+def model_panel() -> html.Div:
+    seg = data.seg()
+    model, ev = seg["model"], seg["eval"]
+    rows = [
+        ("Architecture", f"U-Net, encodeur {model['encoder']} pré-entraîné ImageNet"),
+        ("Taille", f"{str(model['params_m']).replace('.', ',')} M paramètres"),
+        ("Entrée", f"image {model['input']}"),
+        ("Apprentissage", f"{len(model['train_runs'])} vidéos annotées, perte Dice + entropie croisée"),
+        ("Validation", ", ".join(model["val_runs"]).replace("_", " · essai ")),
+        ("Évaluation", ", ".join(model["eval_runs"]).replace("_", " · essai ") + " (jamais vues)"),
+        (
+            "Recouvrement (IoU)",
+            f"cordon {pct(ev['iou']['weld'])} · plasma {pct(ev['iou']['plasma'])} · "
+            f"projections {pct(ev['iou']['spatter'])}",
+        ),
+        (
+            "Projections détectées",
+            f"{pct(ev['spatter_detection']['recall'])} (F1 {pct(ev['spatter_detection']['f1'])})",
+        ),
+    ]
+    return html.Div(
+        className="panel",
+        children=[
+            html.H3("Modèle de segmentation", className="panel-title"),
+            html.P(
+                "Un réseau de neurones repère, sur chaque image, le cordon, le plasma et les projections. Découpage "
+                "par vidéo pour éviter toute fuite entre images voisines ; le modèle tourne hors ligne (GPU), "
+                "l'application ne sert que les résultats."
+            ),
+            html.Dl([item for k, v in rows for item in (html.Dt(k), html.Dd(v))], className="params-grid model-grid"),
+        ],
+    )
+
+
+def signals_panel() -> html.Div:
+    return html.Div(
+        className="panel",
+        children=[
+            html.H3("Ce qui est mesuré, calculé ou modélisé", className="panel-title"),
+            dmc.Table(
+                highlightOnHover=True,
+                verticalSpacing=6,
+                children=[
+                    html.Thead(
+                        html.Tr(
+                            [
+                                html.Th("Signal", style={"width": "28%"}),
+                                html.Th("Statut", style={"width": "120px"}),
+                                html.Th("Origine"),
+                            ]
+                        )
+                    ),
+                    html.Tbody(
+                        [
+                            html.Tr(
+                                [
+                                    html.Td(name),
+                                    html.Td(
+                                        dmc.Badge(
+                                            status,
+                                            variant="light",
+                                            size="sm",
+                                            className="badge-full",
+                                            color=BADGE_COLOR[status],
+                                        )
+                                    ),
+                                    html.Td(desc, className="small"),
+                                ]
+                            )
+                            for name, status, desc in SIGNALS
+                        ]
+                    ),
+                ],
+            ),
+        ],
+    )
+
+
 def layout() -> html.Div:
-    m = data.meta()
-    cal, ds, seg = m["calibration"], m["dataset"], data.seg()
+    ds = data.meta()["dataset"]
     return html.Div(
         className="tab-body about",
         children=[
@@ -67,8 +153,9 @@ def layout() -> html.Div:
                 "Méthode & sources",
                 "Comment ce démonstrateur a été construit, ce qui est mesuré ou modélisé, et d'où viennent les données.",
                 EXPLANATIONS,
+                opened=True,
             ),
-            dmc.Paper(
+            html.Div(
                 className="panel",
                 children=[
                     html.H3("Chaîne de traitement", className="panel-title"),
@@ -81,130 +168,9 @@ def layout() -> html.Div:
                     ),
                 ],
             ),
-            dmc.Grid(
-                gutter="md",
-                mt="xs",
-                children=[
-                    dmc.GridCol(
-                        span={"base": 12, "lg": 7},
-                        children=[
-                            dmc.Paper(
-                                className="panel",
-                                children=[
-                                    html.H3("Ce qui est mesuré, reconstruit ou modélisé", className="panel-title"),
-                                    dmc.Table(
-                                        highlightOnHover=True,
-                                        children=[
-                                            html.Thead(
-                                                html.Tr(
-                                                    [
-                                                        html.Th("Signal", style={"width": "26%"}),
-                                                        html.Th("Statut", style={"width": "120px"}),
-                                                        html.Th("Origine"),
-                                                    ]
-                                                )
-                                            ),
-                                            html.Tbody(
-                                                [
-                                                    html.Tr(
-                                                        [
-                                                            html.Td(name),
-                                                            html.Td(
-                                                                dmc.Badge(
-                                                                    status,
-                                                                    variant="light",
-                                                                    size="sm",
-                                                                    className="badge-full",
-                                                                    color=BADGE_COLOR[status],
-                                                                )
-                                                            ),
-                                                            html.Td(desc, className="small"),
-                                                        ]
-                                                    )
-                                                    for name, status, desc in SIGNALS
-                                                ]
-                                            ),
-                                        ],
-                                    ),
-                                ],
-                            ),
-                        ],
-                    ),
-                    dmc.GridCol(
-                        span={"base": 12, "lg": 5},
-                        children=[
-                            dmc.Paper(
-                                className="panel",
-                                children=[
-                                    html.H3("Étalonnage", className="panel-title"),
-                                    html.P(
-                                        "Aucune mire n'est fournie : l'échelle est déduite du procédé lui-même. Pour chaque "
-                                        "série (le cadrage change d'une série à l'autre), facteur = médiane, sur les runs, du "
-                                        "rapport entre la vitesse de consigne et la vitesse du front du cordon à l'image."
-                                    ),
-                                    dmc.Table(
-                                        children=[
-                                            html.Thead(
-                                                html.Tr(
-                                                    [
-                                                        html.Th("Série"),
-                                                        html.Th("µm / pixel (1024 px)"),
-                                                        html.Th("Champ"),
-                                                        html.Th("Dispersion"),
-                                                    ]
-                                                )
-                                            ),
-                                            html.Tbody(
-                                                [
-                                                    html.Tr(
-                                                        [
-                                                            html.Td(serie),
-                                                            html.Td(
-                                                                f"{1000 * c['mm_per_px_1024']:.1f}".replace(".", ","),
-                                                                className="num",
-                                                            ),
-                                                            html.Td(
-                                                                f"{c['field_of_view_mm']:.1f} mm".replace(".", ","),
-                                                                className="num",
-                                                            ),
-                                                            html.Td(
-                                                                f"{100 * c['cv']:.1f} %".replace(".", ","),
-                                                                className="num",
-                                                            ),
-                                                        ]
-                                                    )
-                                                    for serie, c in cal["series"].items()
-                                                ]
-                                            ),
-                                        ]
-                                    ),
-                                    html.P(
-                                        "Les écarts run par run entre vitesse mesurée et consigne sont donc de vraies "
-                                        "mesures, à un facteur d'échelle commun près par série.",
-                                        className="muted small",
-                                    ),
-                                ],
-                            ),
-                            dmc.Paper(
-                                className="panel",
-                                mt="md",
-                                children=[
-                                    html.H3("Modèle de segmentation", className="panel-title"),
-                                    html.P(
-                                        f"U-Net, encodeur {seg['model']['encoder']} pré-entraîné ImageNet, "
-                                        f"{str(seg['model']['params_m']).replace('.', ',')} M paramètres, perte Dice + entropie croisée. "
-                                        "Découpage par vidéo pour éviter toute fuite entre frames voisines. "
-                                        "Le modèle tourne hors ligne (GPU) : l'application ne sert que les résultats."
-                                    ),
-                                ],
-                            ),
-                        ],
-                    ),
-                ],
-            ),
-            dmc.Paper(
+            html.Div([model_panel(), signals_panel()], className="about-grid"),
+            html.Div(
                 className="panel",
-                mt="md",
                 children=[
                     html.H3("Données & licence", className="panel-title"),
                     html.P(
