@@ -1,0 +1,20 @@
+# Reverse proxy TLS devant l'app (certificat Let's Encrypt automatique).
+{$DOMAIN} {
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=63072000; includeSubDomains"
+		-Server
+		-Via
+	}
+
+	# Les vidéos et images sont immuables entre deux déploiements.
+	@media path /media/* /overlay/*
+	header @media Cache-Control "public, max-age=604800"
+
+	request_body {
+		max_size 64KB
+	}
+
+	reverse_proxy app:8050
+}

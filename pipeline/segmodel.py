@@ -38,9 +38,20 @@ def load_model(path, device: str = "cuda") -> torch.nn.Module:
 STATIC_FRACTION = {2: 0.35, 3: 0.08}
 
 
+INITIAL_FRACTION = 0.02  # début de vidéo : le laser n'a pas encore produit de cordon
+
+
 def suppress_static(labels: np.ndarray) -> np.ndarray:
-    """labels (N, H, W) -> mêmes cartes sans les détections plasma / projections immobiles."""
+    """labels (N, H, W) -> mêmes cartes sans les détections immobiles :
+    - plasma / projections présents sur une trop grande part de la vidéo (reflets, rayures) ;
+    - « cordon » déjà visible dans les toutes premières frames (texture prise pour une soudure)."""
     out = labels.copy()
+    n_first = max(5, int(INITIAL_FRACTION * len(labels)))
+    background_weld = (labels[:n_first] == 1).mean(0) >= 0.5
+    if background_weld.any():
+        region = out[:, background_weld]
+        region[region == 1] = 0
+        out[:, background_weld] = region
     for cid, frac in STATIC_FRACTION.items():
         static = (labels == cid).mean(0) > frac
         if static.any():
