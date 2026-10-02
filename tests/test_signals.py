@@ -63,3 +63,9 @@ def test_off_bounded_by_weld_front_arrival(signals):
     on, off = signals.detect_on_off(plasma, fps=6000, front=front)
     assert abs(on - 100) <= 2
     assert 395 <= off <= 410
+
+
+def test_group_events_debounce(signals):
+    mask = np.array([1, 0, 1, 1, 0, 0, 0, 1], bool)
+    assert signals.group_events(mask, max_gap=1) == [(0, 3), (7, 7)]
+    assert signals.group_events(mask, max_gap=3) == [(0, 7)]

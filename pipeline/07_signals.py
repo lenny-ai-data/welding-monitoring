@@ -28,6 +28,7 @@ ON_WINDOW_MS = 1.5  # fenêtre de lissage de la détection allumage / extinction
 SPEED_WINDOW_MS = 20.0  # fenêtre de la pente glissante (régression locale d'ordre 1)
 STAB_WINDOW_MS = 5.0  # fenêtre du coefficient de variation glissant du plasma
 SPEED_TOL = 0.20  # écart de vitesse toléré avant alarme (bruit de mesure médian ~5 %)
+ALARM_MERGE_MS = 1.0  # deux alarmes de même type à moins de 1 ms d'écart sont fusionnées
 SPEED_ALARM_MS = 5.0  # durée minimale d'un écart de vitesse pour lever une alarme
 SPIKE_SIGMA = 3.0
 FRONT_GATE_PX = 60  # écart maximal front du cordon / centre du panache (px à 512, ~2 mm)
@@ -133,17 +134,22 @@ def calibrate(runs: pd.DataFrame, feats: pd.DataFrame) -> tuple[dict, pd.DataFra
     return scales, cal
 
 
-def group_events(mask: np.ndarray, min_len: int = 1) -> list[tuple[int, int]]:
-    """Regroupe les frames consécutives d'un masque booléen en (début, fin)."""
+def group_events(mask: np.ndarray, min_len: int = 1, max_gap: int = 0) -> list[tuple[int, int]]:
+    """Regroupe les frames consécutives d'un masque booléen en (début, fin).
+
+    max_gap : deux épisodes séparés d'au plus max_gap frames n'en font qu'un (anti-rebond, comme une
+    alarme de supervision qui ne se redéclenche pas en rafale)."""
     events, start = [], None
     for i, m in enumerate(np.append(mask, False)):
         if m and start is None:
             start = i
         elif not m and start is not None:
-            if i - start >= min_len:
+            if events and start - events[-1][1] - 1 <= max_gap:
+                events[-1] = (events[-1][0], i - 1)
+            else:
                 events.append((start, i - 1))
             start = None
-    return events
+    return [(s, e) for s, e in events if e - s + 1 >= min_len]
 
 
 def run_signals(run, f: pd.DataFrame, scale: float, spatter_burst: int) -> tuple[dict, dict]:
@@ -198,10 +204,11 @@ def run_signals(run, f: pd.DataFrame, scale: float, spatter_burst: int) -> tuple
         med = np.median(ref)
         sigma = 1.4826 * np.median(np.abs(ref - med))  # écart-type robuste (MAD)
         plasma_threshold = med + SPIKE_SIGMA * sigma
+        merge = frames_for(ALARM_MERGE_MS, fps)
         spikes = is_on & (plasma_mm2 > plasma_threshold)
-        events += [{"type": "plasma_spike", "start": s, "end": e} for s, e in group_events(spikes)]
+        events += [{"type": "plasma_spike", "start": s, "end": e} for s, e in group_events(spikes, max_gap=merge)]
         bursts = is_on & (spatter_n >= spatter_burst)
-        events += [{"type": "spatter_burst", "start": s, "end": e} for s, e in group_events(bursts)]
+        events += [{"type": "spatter_burst", "start": s, "end": e} for s, e in group_events(bursts, max_gap=merge)]
         steady = np.zeros(n, bool)
         steady[sl] = True
         dev = steady & (np.abs(speed - run.feedrate_mm_s) > SPEED_TOL * run.feedrate_mm_s)

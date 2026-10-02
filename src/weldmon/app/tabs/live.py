@@ -9,6 +9,43 @@ import dash_mantine_components as dmc
 from dash import ClientsideFunction, Input, Output, State, callback, clientside_callback, dcc, html
 
 from .. import data, theme
+from ..components import point, section_header
+
+EXPLANATIONS = [
+    point(
+        "Ce que vous voyez",
+        "une soudure laser réelle filmée par une caméra ultra-rapide (6 000 à 9 000 images par seconde). Une "
+        "soudure complète dure moins de 0,15 seconde : la vidéo est ralentie environ 200 fois.",
+    ),
+    point(
+        "Les masques IA",
+        "un modèle d'intelligence artificielle repère sur chaque image le cordon de soudure (violet), le panache "
+        "de plasma (orange) — la vapeur de métal ionisée au-dessus du point de soudage — et les projections de "
+        "métal fondu (magenta). Le bouton « Vidéo brute » retire ces couleurs.",
+    ),
+    point(
+        "Les courbes",
+        "en pointillés, ce qui est programmé sur la machine (puissance, vitesse) ; en couleur, ce qui est mesuré "
+        "à l'image : vitesse réelle d'avance, taille du plasma, nombre de projections, longueur du cordon. Elles "
+        "avancent au rythme de la vidéo.",
+    ),
+    point(
+        "Les alarmes",
+        "un pic anormal de plasma ou une rafale de projections trahit une instabilité du bain de fusion, "
+        "souvent à l'origine de défauts (porosités, manque de matière). Elles sont marquées sur les courbes "
+        "(triangles, losanges) et listées dans le journal.",
+    ),
+    point(
+        "Ligne de production",
+        "activée, elle enchaîne les 81 soudures dans l'ordre exact où elles ont été réalisées, comme une ligne en "
+        "fonctionnement. Désactivez-la pour choisir un essai précis dans la liste.",
+    ),
+    point(
+        "Badge « hors domaine »",
+        "le modèle a appris sur la série DoE3 ; les séries DoE1 et DoE2 ont été filmées avec un éclairage et un "
+        "cadrage différents. Les mesures y restent exploitables mais moins précises — c'est signalé, pas caché.",
+    ),
+]
 
 # Pistes du graphe live : (clé, titre, unité, part de hauteur)
 TRACKS = [
@@ -64,6 +101,12 @@ def layout() -> html.Div:
     return html.Div(
         className="tab-body",
         children=[
+            section_header(
+                "Monitoring live",
+                "Une soudure laser réelle, filmée à 6 000 images par seconde, rejouée avec ses signaux de procédé "
+                "comme sur un écran de supervision d'atelier.",
+                EXPLANATIONS,
+            ),
             dmc.Grid(
                 gutter="md",
                 children=[
@@ -94,7 +137,7 @@ def layout() -> html.Div:
                                             dmc.Switch(
                                                 id="prod-mode",
                                                 label="Ligne de production",
-                                                checked=False,
+                                                checked=True,
                                                 description="Enchaîne les runs dans l'ordre réel",
                                                 size="sm",
                                             ),
@@ -122,7 +165,7 @@ def layout() -> html.Div:
                                         children=[
                                             dmc.SegmentedControl(
                                                 id="video-source",
-                                                value="raw",
+                                                value="ia",
                                                 size="xs",
                                                 data=[
                                                     {"value": "raw", "label": "Vidéo brute"},
@@ -147,45 +190,46 @@ def layout() -> html.Div:
                     ),
                     dmc.GridCol(
                         span={"base": 12, "lg": 7},
-                        children=[
-                            html.Div(
-                                className="kpi-row",
-                                children=[
-                                    kpi_card("power", "Puissance"),
-                                    kpi_card("speed", "Vitesse"),
-                                    kpi_card("plasma", "Plasma"),
-                                    kpi_card("stab", "Instabilité"),
-                                    kpi_card("spatter", "Projections"),
-                                    kpi_card("status", "Statut"),
-                                ],
-                            ),
-                            dmc.Paper(
-                                className="panel",
-                                mt="md",
-                                children=[
-                                    dcc.Graph(
-                                        id="live-graph",
-                                        config={"displayModeBar": False, "responsive": True},
-                                        style={"height": "640px"},
-                                    ),
-                                ],
-                            ),
-                        ],
+                        children=html.Div(
+                            className="live-right",
+                            children=[
+                                html.Div(
+                                    className="kpi-row",
+                                    children=[
+                                        kpi_card("power", "Puissance"),
+                                        kpi_card("speed", "Vitesse"),
+                                        kpi_card("plasma", "Plasma"),
+                                        kpi_card("stab", "Instabilité"),
+                                        kpi_card("spatter", "Projections"),
+                                        kpi_card("status", "Statut"),
+                                    ],
+                                ),
+                                dmc.Paper(
+                                    className="panel",
+                                    children=[
+                                        dcc.Graph(
+                                            id="live-graph",
+                                            config={"displayModeBar": False, "responsive": True},
+                                            style={"height": "560px"},
+                                        ),
+                                    ],
+                                ),
+                                dmc.Paper(
+                                    className="panel events-panel",
+                                    children=[
+                                        dmc.Group(
+                                            justify="space-between",
+                                            children=[
+                                                html.H3("Journal d'événements", className="panel-title"),
+                                                html.Span(id="events-count", className="muted"),
+                                            ],
+                                        ),
+                                        html.Ul(id="events-log", className="events"),
+                                    ],
+                                ),
+                            ],
+                        ),
                     ),
-                ],
-            ),
-            dmc.Paper(
-                className="panel",
-                mt="md",
-                children=[
-                    dmc.Group(
-                        justify="space-between",
-                        children=[
-                            html.H3("Journal d'événements", className="panel-title"),
-                            html.Span(id="events-count", className="muted"),
-                        ],
-                    ),
-                    html.Ul(id="events-log", className="events"),
                 ],
             ),
             dcc.Store(id="live-data"),

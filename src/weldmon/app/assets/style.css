@@ -140,22 +140,98 @@ body {
   -webkit-mask: var(--icon) center / contain no-repeat;
   mask: var(--icon) center / contain no-repeat;
 }
-.icon-sun {
-  --icon: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round'><circle cx='12' cy='12' r='4'/><path d='M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4'/></svg>");
+.icon-activity { --icon: url("icons/activity.svg"); }
+.icon-scan-eye { --icon: url("icons/scan-eye.svg"); }
+.icon-chart-scatter { --icon: url("icons/chart-scatter.svg"); }
+.icon-book-open { --icon: url("icons/book-open.svg"); }
+.icon-info { --icon: url("icons/info.svg"); }
+.icon-sun { --icon: url("icons/sun.svg"); }
+.icon-moon { --icon: url("icons/moon.svg"); }
+
+/* Barre latérale ---------------------------------------------------------------------------------- */
+.navbar {
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  padding: 14px 10px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
 }
-.icon-moon {
-  --icon: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z'/></svg>");
+.nav-links {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.nav-link {
+  border-radius: 10px;
+  font-weight: 500;
+  color: var(--text-2);
+}
+.nav-link[data-active] {
+  color: var(--text);
+  box-shadow: inset 3px 0 0 var(--weld);
+}
+.nav-footer {
+  font-size: 12px;
+  line-height: 1.6;
+  padding: 10px 8px;
+  border-top: 1px solid var(--border);
+}
+.nav-footer a {
+  color: var(--text-2);
+  text-decoration: none;
+}
+.nav-footer a:hover {
+  color: var(--text);
+  text-decoration: underline;
+}
+
+/* En-tête de section + explications -------------------------------------------------------------- */
+.section-header {
+  margin-bottom: 16px;
+}
+.section-title {
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin: 2px 0 2px;
+}
+.section-subtitle {
+  margin: 0 0 12px;
+  color: var(--text-2);
+  font-size: 14px;
+}
+.info-accordion .mantine-Accordion-item {
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+.info-accordion .mantine-Accordion-control {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text);
+}
+.info-accordion .mantine-Accordion-control .icon {
+  color: var(--plasma);
+}
+.info-body {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 6px 28px;
+}
+.info-body p {
+  margin: 4px 0;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--text-2);
+}
+.info-body strong {
+  color: var(--text);
 }
 
 /* Onglets & panneaux ---------------------------------------------------------------------------- */
-.tabs {
+.sections {
   max-width: 1680px;
   margin: 0 auto;
-}
-.tabs-list {
-  gap: 6px;
-  margin-bottom: 16px;
-  flex-wrap: wrap;
 }
 .tab-body {
   padding-bottom: 32px;
@@ -216,6 +292,9 @@ body {
 }
 .kpi-row-4 {
   grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.seg-metrics {
+  margin-top: 16px;
 }
 .kpi {
   background: var(--surface);
@@ -321,15 +400,30 @@ body {
 }
 
 /* Journal d'événements ------------------------------------------------------------------------- */
+.live-right {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  height: 100%;
+}
+/* Le journal occupe la hauteur restante de la colonne et défile au-delà. */
+.events-panel {
+  flex: 1 1 0;
+  min-height: 220px;
+  display: flex;
+  flex-direction: column;
+}
 .events {
   list-style: none;
   margin: 4px 0 0;
-  padding: 0;
-  max-height: 210px;
+  padding: 0 4px 0 0;
+  flex: 1 1 0;
+  min-height: 0;
   overflow-y: auto;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 4px 16px;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  align-content: start;
+  gap: 0 16px;
 }
 .event {
   display: flex;

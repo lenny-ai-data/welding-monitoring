@@ -8,6 +8,40 @@ import dash_mantine_components as dmc
 from dash import ClientsideFunction, Input, Output, State, callback, clientside_callback, dcc, html
 
 from .. import data, theme
+from ..components import point, section_header
+
+EXPLANATIONS = [
+    point(
+        "La segmentation",
+        "consiste à attribuer chaque pixel d'une image à une catégorie. Ici trois : le cordon de soudure "
+        "(violet), le panache de plasma (orange) et les projections de métal fondu (magenta).",
+    ),
+    point(
+        "L'annotation humaine",
+        "sur 8 vidéos, des chercheurs ont délimité ces zones image par image (164 images par vidéo), aidés de "
+        "l'outil SAM2 puis en corrigeant à la main. C'est la « vérité terrain » qui sert de référence.",
+    ),
+    point(
+        "Le modèle IA",
+        "un réseau de neurones (U-Net) a appris sur 6 de ces vidéos, puis a été testé sur les 2 qu'il n'avait "
+        "jamais vues (badge « évaluation ») : c'est le seul test honnête de ce qu'il sait faire.",
+    ),
+    point(
+        "Côte à côte / Désaccords",
+        "comparez l'annotation (à gauche) et la prédiction (à droite), ou n'affichez en rouge que les pixels où "
+        "les deux divergent. Le bouton « Lecture » fait défiler les images.",
+    ),
+    point(
+        "L'IoU (Intersection over Union)",
+        "mesure le recouvrement entre la zone tracée par l'humain et celle trouvée par l'IA : 100 % = identique. "
+        "Les projections, qui ne font que quelques pixels, sont naturellement les plus difficiles.",
+    ),
+    point(
+        "La baseline",
+        "une méthode classique sans IA (seuil de luminosité), mesurée sur les mêmes images : elle montre l'apport "
+        "réel du modèle.",
+    ),
+]
 
 # Teinte moyenne de chaque classe (lisible dans les deux thèmes).
 CHIP_COLORS = {"weld": "#9550d8", "plasma": "#dd6a1e", "spatter": "#d2448c"}
@@ -48,6 +82,20 @@ def pct(v: float | None) -> str:
     return "—" if v is None else f"{100 * v:.0f} %".replace(".", ",")
 
 
+def metric_cards() -> html.Div:
+    ev = data.seg()["eval"]
+    sd = ev["spatter_detection"]
+    return html.Div(
+        className="kpi-row kpi-row-4 seg-metrics",
+        children=[
+            metric("mIoU (3 classes)", pct(ev["miou"]), "2 vidéos d'évaluation"),
+            metric("IoU cordon", pct(ev["iou"]["weld"]), "recouvrement"),
+            metric("IoU plasma", pct(ev["iou"]["plasma"]), "recouvrement"),
+            metric("Projections détectées", pct(sd["recall"]), f"précision {pct(sd['precision'])}"),
+        ],
+    )
+
+
 def metrics_block() -> html.Div:
     s = data.seg()
     ev, base = s["eval"], s["baseline"]
@@ -65,19 +113,6 @@ def metrics_block() -> html.Div:
     ]
     return html.Div(
         [
-            html.Div(
-                className="kpi-row kpi-row-4",
-                children=[
-                    metric("mIoU (3 classes)", pct(ev["miou"]), "vidéos d'évaluation DoE3_19 + DoE3_23"),
-                    metric("IoU cordon", pct(ev["iou"]["weld"])),
-                    metric("IoU plasma", pct(ev["iou"]["plasma"])),
-                    metric(
-                        "Projections détectées",
-                        f"{pct(sd['recall'])}",
-                        f"précision {pct(sd['precision'])} · F1 {pct(sd['f1'])}",
-                    ),
-                ],
-            ),
             dmc.Paper(
                 className="panel",
                 mt="md",
@@ -128,6 +163,11 @@ def layout() -> html.Div:
     return html.Div(
         className="tab-body",
         children=[
+            section_header(
+                "Vidéo & masques IA",
+                "Comment l'IA « voit » une soudure : son analyse comparée, image par image, à celle d'experts humains.",
+                EXPLANATIONS,
+            ),
             dmc.Grid(
                 gutter="md",
                 children=[
@@ -157,8 +197,6 @@ def layout() -> html.Div:
                                                 value="compare",
                                                 size="xs",
                                                 data=[
-                                                    {"value": "gt", "label": "Annotation"},
-                                                    {"value": "pred", "label": "Modèle IA"},
                                                     {"value": "compare", "label": "Côte à côte"},
                                                     {"value": "diff", "label": "Désaccords"},
                                                 ],
@@ -245,6 +283,7 @@ def layout() -> html.Div:
                                     ),
                                 ],
                             ),
+                            metric_cards(),
                         ],
                     ),
                     dmc.GridCol(
@@ -277,7 +316,7 @@ def layout() -> html.Div:
                     ),
                 ],
             ),
-            html.Div(metrics_block(), style={"marginTop": "16px"}),
+            metrics_block(),
             dcc.Store(id="seg-figs"),
             dcc.Interval(id="seg-tick", interval=120, disabled=True),
         ],
