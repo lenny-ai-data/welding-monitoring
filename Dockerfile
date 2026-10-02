@@ -35,7 +35,7 @@ FROM ${PYTHON_IMAGE} AS runtime
 LABEL org.opencontainers.image.title="Weld Process Monitor" \
       org.opencontainers.image.description="Monitoring de soudage laser rejoué : vidéo haute vitesse, segmentation IA, DoE" \
       org.opencontainers.image.authors="Lenny Jacquinot" \
-      org.opencontainers.image.source="https://github.com/lenny-ai-data/laser-welding-monitor" \
+      org.opencontainers.image.source="https://github.com/lenny-ai-data/welding-monitoring" \
       org.opencontainers.image.licenses="Code: propriétaire ; données dérivées du dataset Zenodo 10.5281/zenodo.22282527 (CC BY-NC 4.0)"
 
 RUN addgroup -S -g 10001 app \
