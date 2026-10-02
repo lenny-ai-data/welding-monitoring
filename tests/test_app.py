@@ -94,11 +94,42 @@ def test_valid_run_whitelist():
         assert data.valid_run(bad) is None
 
 
-def test_live_payload_shapes():
-    from weldmon.app.tabs import live
+def test_process_payload_shapes():
+    from weldmon.app.tabs import process
 
-    payload = live.live_payload("DoE3_19", "dark")
+    payload = process.live_payload("DoE3_19", "dark")
     n = payload["n"]
     assert all(len(v) == n for v in payload["ts"].values())
     assert payload["next"] in data.runs_by_id()
     assert {e["type"] for e in payload["events"]} >= {"on", "off"}
+
+
+def test_run_verdicts_follow_quality_rules():
+    q = data.meta()["quality"]
+    for r in data.runs():
+        assert r["verdict"] in ("ok", "warn", "nok")
+        if r["n_speed_deviation"] or r["n_alarms"] > q["verdict_warn_max_alarms"]:
+            assert r["verdict"] == "nok"
+        elif r["n_alarms"] <= q["verdict_ok_max_alarms"]:
+            assert r["verdict"] == "ok"
+        else:
+            assert r["verdict"] == "warn"
+    assert 0 < q["stability_limit_cv"] < 2
+
+
+def test_history_orders_campaigns_newest_first():
+    from weldmon.app.tabs import history
+
+    runs = history.runs_sorted()
+    assert [r["serie"] for r in runs[:1]] == ["DoE3"] and runs[-1]["serie"] == "DoE1"
+    doe3 = [r["point"] for r in runs if r["serie"] == "DoE3"]
+    assert doe3 == sorted(doe3)
+    fig = history.trend_figure("DoE3_19", "nok", "dark")
+    assert len(fig["data"][0]["x"]) == len(data.runs())
+
+
+def test_history_detail_renders_every_run():
+    from weldmon.app.tabs import history
+
+    for r in data.runs():
+        assert history.detail(r)

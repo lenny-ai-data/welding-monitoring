@@ -1,4 +1,4 @@
-"""Onglet « Analyse DoE » : fenêtre de procédé à partir des 81 runs (3 séries Box-Behnken).
+"""Onglet « Analyses » : fenêtre de procédé à partir des 81 runs (3 séries Box-Behnken).
 
 Les surfaces sont recalculées ici à partir des coefficients exportés (Python pur, sans numpy).
 """
@@ -27,11 +27,11 @@ EXPLANATIONS = [
     point(
         "La surface de réponse",
         "un modèle statistique prédit l'indicateur pour toute combinaison de deux réglages (les deux autres au "
-        "milieu de leur plage). Couleurs chaudes = valeurs élevées ; les points sont les essais réellement faits.",
+        "milieu de leur plage). Violet foncé = valeurs élevées ; les points sont les essais réellement faits.",
     ),
     point(
         "Les effets standardisés",
-        "quels réglages ont un impact statistiquement démontré (barres orange, au-delà du seuil p = 0,05) et "
+        "quels réglages ont un impact statistiquement démontré (barres violettes, au-delà du seuil p = 0,05) et "
         "lesquels se confondent avec le bruit de mesure (barres grises).",
     ),
     point(
@@ -82,8 +82,9 @@ def layout() -> html.Div:
         className="tab-body",
         children=[
             section_header(
-                "Analyse DoE",
-                "Quels réglages de la machine influencent la soudure ? Lecture statistique des 81 essais.",
+                "Analyses",
+                "Quels réglages de la machine influencent la qualité ? Modèles statistiques ajustés sur les 81 "
+                "soudures, à réévaluer au fil de la production.",
                 EXPLANATIONS,
             ),
             dmc.Paper(
@@ -254,8 +255,8 @@ def surface_fig(kpi_key: str, fx: str, fy: str, scheme) -> dict:
             "x": [real(fx, c) for c in grid],
             "y": [real(fy, c) for c in grid],
             "z": z,
-            "colorscale": theme.PLASMA_SCALE,
-            "contours": {"coloring": "heatmap", "showlabels": True, "labelfont": {"size": 10, "color": "#ffffff"}},
+            "colorscale": theme.VIOLET_SCALE,
+            "contours": {"coloring": "heatmap", "showlabels": False},
             "line": {"width": 0.5, "color": "rgba(255,255,255,0.35)"},
             "ncontours": 14,
             "colorbar": {
@@ -309,7 +310,7 @@ def pareto_fig(kpi_key: str, scheme) -> dict:
             "orientation": "h",
             "x": [abs(e["t"]) for e in eff],
             "y": [pretty_term(e["term"]) for e in eff],
-            "marker": {"color": [t["plasma"] if s else t["muted"] for s in sig], "cornerradius": 3},
+            "marker": {"color": [t["line"] if s else t["muted"] for s in sig], "cornerradius": 3},
             "customdata": [[e["coef"], e["p"]] for e in eff],
             "hovertemplate": "%{y}<br>|t| = %{x:.2f} · coef %{customdata[0]:.4~f} · p = %{customdata[1]:.3f}"
             "<extra></extra>",
@@ -318,7 +319,7 @@ def pareto_fig(kpi_key: str, scheme) -> dict:
     layout = theme.base_layout(
         scheme, showlegend=False, hovermode="closest", bargap=0.35, margin={"l": 12, "r": 16, "t": 24, "b": 44}
     )
-    layout["xaxis"] = theme.axis(t, title={"text": "|t| (orange : significatif, p < 0,05)"}, rangemode="tozero")
+    layout["xaxis"] = theme.axis(t, title={"text": "|t| (violet : significatif, p < 0,05)"}, rangemode="tozero")
     layout["yaxis"] = theme.axis(t, showgrid=False, ticks="", automargin=True)
     layout["shapes"] = [
         {
@@ -374,8 +375,8 @@ def main_effects_fig(kpi_key: str, scheme) -> dict:
                 "y": means,
                 "xaxis": xa,
                 "yaxis": ya,
-                "line": {"color": t["plasma"], "width": 2},
-                "marker": {"size": 8, "color": t["plasma"], "line": {"width": 2, "color": t["surface"]}},
+                "line": {"color": t["line"], "width": 2},
+                "marker": {"size": 8, "color": t["line"], "line": {"width": 2, "color": t["surface"]}},
                 "error_y": {"type": "data", "array": errs, "color": t["muted"], "thickness": 1, "width": 4},
                 "hovertemplate": f"{f['label']} %{{x}} {f['unit']}<br>moyenne %{{y:.3~f}} {unit}<extra></extra>",
             }
@@ -516,7 +517,7 @@ def energy_fig(kpi_key: str, scheme) -> dict:
             "mode": "markers",
             "x": [r["line_energy_j_mm"] for r in runs],
             "y": [r[kpi_key] for r in runs],
-            "marker": {"size": 8, "color": t["plasma"], "opacity": 0.85, "line": {"width": 1, "color": t["surface"]}},
+            "marker": {"size": 8, "color": t["line"], "opacity": 0.85, "line": {"width": 1, "color": t["surface"]}},
             "customdata": [[r["run_id"], r["power_w"], r["feedrate_mm_s"]] for r in runs],
             "hovertemplate": "%{customdata[0]} · %{customdata[1]:.0f} W · %{customdata[2]:.0f} mm/s<br>"
             "E = %{x:.1f} J/mm<br>%{y:.3~f}<extra></extra>",
