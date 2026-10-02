@@ -8,15 +8,33 @@
 import cv2
 import numpy as np
 import pandas as pd
-
 from common import (
-    CLASS_IDS, EVAL_RUNS, LABELED_RUNS, LABELS_DIR, PROCESSED, SIZE, run_dir_name, video_path,
+    CLASS_IDS,
+    EVAL_RUNS,
+    LABELED_RUNS,
+    LABELS_DIR,
+    PROCESSED,
+    SIZE,
+    run_dir_name,
+    video_path,
 )
 
 IGNORE = 255
 N_LABELED = 164
-COMMON = ["frame_file", "frame_index", "mask_path", "label", "track_id", "area",
-          "bbox_x", "bbox_y", "bbox_w", "bbox_h", "cx_geo", "cy_geo"]
+COMMON = [
+    "frame_file",
+    "frame_index",
+    "mask_path",
+    "label",
+    "track_id",
+    "area",
+    "bbox_x",
+    "bbox_y",
+    "bbox_w",
+    "bbox_h",
+    "cx_geo",
+    "cy_geo",
+]
 PAINT_ORDER = ["dynamic_other", "weld", "plasma", "spatter"]  # le dernier peint gagne
 OUT = PROCESSED / "labels"
 
@@ -45,8 +63,10 @@ def frame_mapping(run_id: str, n_video_frames: int) -> np.ndarray:
     """Index vidéo de chaque frame annotée, vérifié contre les fichiers de mapping fournis."""
     mapping = np.round(np.linspace(0, n_video_frames - 1, N_LABELED)).astype(int)
     root = run_root(run_id)
-    for ref_file, col in [(root / "frames" / "frame_mapping.csv", "original_video_frame_index"),
-                          (root / f"{run_id}_gui_frame_mapping.csv", "original_frame_index")]:
+    for ref_file, col in [
+        (root / "frames" / "frame_mapping.csv", "original_video_frame_index"),
+        (root / f"{run_id}_gui_frame_mapping.csv", "original_frame_index"),
+    ]:
         if ref_file.exists():
             ref = pd.read_csv(ref_file)[col].to_numpy()
             assert np.array_equal(ref, mapping[: len(ref)]), f"mapping incohérent pour {run_id}"
@@ -104,8 +124,12 @@ def main() -> None:
             lab = label_map(run_id, instances[instances.frame_index == k])
             cv2.imwrite(str(OUT / run_id / "frames" / f"{k:03d}.png"), img)
             cv2.imwrite(str(OUT / run_id / "masks" / f"{k:03d}.png"), lab)
-            row = {"run_id": run_id, "gt_index": k, "video_frame": int(mapping[k]),
-                   "split": "eval" if run_id in EVAL_RUNS else "train"}
+            row = {
+                "run_id": run_id,
+                "gt_index": k,
+                "video_frame": int(mapping[k]),
+                "split": "eval" if run_id in EVAL_RUNS else "train",
+            }
             row.update({f"px_{name}": int((lab == cid).sum()) for name, cid in CLASS_IDS.items()})
             index_rows.append(row)
         print(f"ok {run_id}: {len(instances)} instances")

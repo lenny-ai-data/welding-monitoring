@@ -8,7 +8,6 @@ import re
 from datetime import datetime
 
 import pandas as pd
-
 from common import METADATA_XLSX, PROCESSED, cihx_path
 
 FACTOR_COLUMNS = {

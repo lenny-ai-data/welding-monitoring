@@ -32,7 +32,7 @@ app:  ## Lance l'app en local (http://127.0.0.1:8050)
 	uv run python -m weldmon.app.main
 
 test:  ## Tests unitaires
-	uv run --group pipeline pytest -q
+	uv run --group analysis pytest -q
 
 lint:  ## Lint + format check
 	uv run ruff check . && uv run ruff format --check .
@@ -47,5 +47,5 @@ docker-run:  ## Lance l'image avec les options de durcissement
 scan:  ## Scan de vulnérabilités (Trivy + pip-audit)
 	docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:latest image \
 		--severity CRITICAL,HIGH --exit-code 1 --ignore-unfixed $(IMAGE):latest
-	uv export --no-dev --no-default-groups --format requirements-txt > /tmp/req.txt && \
-		uvx pip-audit -r /tmp/req.txt
+	uv export --frozen --no-dev --no-default-groups --no-emit-project --format requirements-txt > /tmp/weldmon-req.txt
+	uvx pip-audit -r /tmp/weldmon-req.txt --strict --disable-pip --no-deps
