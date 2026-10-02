@@ -112,7 +112,11 @@ def campaign_block(serie: str) -> html.Div:
                 className="run-tiles",
                 children=[
                     html.Button(
-                        [icon(VERDICTS[r["verdict"]][1], 13), f"Essai {r['point']}"],
+                        [
+                            icon(VERDICTS[r["verdict"]][1], 13),
+                            html.Span("Essai ", className="tile-prefix"),
+                            str(r["point"]),
+                        ],
                         id={"type": "hist-run", "index": r["run_id"]},
                         n_clicks=0,
                         type="button",
@@ -166,7 +170,7 @@ def layout() -> html.Div:
                                     dcc.Graph(
                                         id="hist-trend",
                                         config={"displayModeBar": False, "responsive": True},
-                                        style={"height": "220px"},
+                                        style={"height": "190px"},
                                     ),
                                 ],
                             ),
@@ -230,7 +234,7 @@ def detail(run: dict) -> list:
             children=[
                 html.Div([html.Span(k, className="muted"), html.Strong(v)])
                 for k, v in [
-                    ("Puissance", f"{run['power_w']:,.0f} W".replace(",", "\u202f")),
+                    ("Puissance", f"{run['power_w']:,.0f} W".replace(",", "\u00a0")),
                     ("Vitesse", f"{run['feedrate_mm_s']:.0f} mm/s"),
                     ("Défocalisation", fmt(run["defocus_mm"], 1, "mm")),
                     ("PFO Y", f"{run['pfo_y_mm']:.0f} mm"),

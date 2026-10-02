@@ -40,6 +40,7 @@ TOKENS = {
         "cursor": "#1a1430",
         "ring": "#8c18cc",
         "gold": "#b07c07",
+        "bar_muted": "rgba(107, 100, 128, 0.3)",
         "alarm": "#c8323c",
         "setpoint": "#5d566f",
         "weld": "#7e03a8",
@@ -62,6 +63,7 @@ TOKENS = {
         "cursor": "#ece8f7",
         "ring": "#a35bf0",
         "gold": "#e7b84a",
+        "bar_muted": "rgba(142, 134, 166, 0.35)",
         "alarm": "#f07070",
         "setpoint": "#b3abc9",
         "weld": "#9550d8",
@@ -76,18 +78,40 @@ STATUS = {"good": "#0ca30c", "warning": "#fab219", "serious": "#ec835a", "critic
 # Verdict qualité d'une soudure (suivi & historique) : vert / doré / rouge + icône.
 VERDICT = {
     "light": {"ok": "#16803c", "warn": "#a36f00", "nok": "#c8323c"},
-    "dark": {"ok": "#4cc47e", "warn": "#e7b84a", "nok": "#f07070"},
+    "dark": {"ok": "#86c79f", "warn": "#d6bd82", "nok": "#e09a9a"},
 }
 
-# Échelle séquentielle des surfaces de réponse : une seule teinte, du clair au foncé.
-VIOLET_SCALE = [
-    [0.0, "#f6ecfc"],
-    [0.2, "#d4acf4"],
-    [0.4, "#a95ae8"],
-    [0.6, "#8c18cc"],
-    [0.8, "#600e8d"],
-    [1.0, "#2e0546"],
+# Échelle des surfaces de réponse : gamme « plasma » (perceptuelle, monotone), adoucie vers le fond de
+# page pour ne pas éblouir (voir pale_plasma).
+PLASMA_STOPS = [
+    "#0d0887",
+    "#46039f",
+    "#7201a8",
+    "#9c179e",
+    "#bd3786",
+    "#d8576b",
+    "#ed7953",
+    "#fb9f3a",
+    "#fdca26",
+    "#f0f921",
 ]
+
+
+def _mix(a: str, b: str, k: float) -> str:
+    ca = [int(a[i : i + 2], 16) for i in (1, 3, 5)]
+    cb = [int(b[i : i + 2], 16) for i in (1, 3, 5)]
+    return "#" + "".join(f"{round(x + (y - x) * k):02x}" for x, y in zip(ca, cb, strict=True))
+
+
+def pale_plasma(scheme: str | None) -> list:
+    """Gamme plasma sans ses extrêmes (bleu nuit, jaune citron), mélangée à la couleur de fond : lisible,
+    sans couleurs criardes."""
+    light = scheme == "light"
+    page, k = (TOKENS["light"]["page"], 0.42) if light else (TOKENS["dark"]["surface"], 0.38)
+    stops = PLASMA_STOPS[1:-1]
+    n = len(stops) - 1
+    return [[i / n, _mix(c, page, k)] for i, c in enumerate(stops)]
+
 
 FONT = "Sora, system-ui, -apple-system, 'Segoe UI', sans-serif"
 
@@ -101,18 +125,22 @@ def verdict_colors(scheme: str | None) -> dict:
 
 
 def axis(t: dict, **kw) -> dict:
+    """Axe épuré (style des courbes du monitoring) : grille horizontale légère, valeurs, pas de trait."""
     return {
         "gridcolor": t["grid"],
         "linecolor": t["axis"],
         "zerolinecolor": t["grid"],
-        "tickcolor": t["axis"],
-        "showline": True,
-        "ticks": "outside",
-        "ticklen": 4,
+        "showline": False,
+        "ticks": "",
         "tickfont": {"size": 11, "color": t["muted"]},
         "title": {"font": {"size": 12, "color": t["text2"]}},
         **kw,
     }
+
+
+def xaxis(t: dict, **kw) -> dict:
+    """Axe horizontal : simple ligne de base, sans grille verticale."""
+    return axis(t, **({"showgrid": False, "showline": True} | kw))
 
 
 def base_layout(scheme: str | None, **kw) -> dict:
@@ -128,7 +156,7 @@ def base_layout(scheme: str | None, **kw) -> dict:
             "font": {"family": FONT, "color": t["text"], "size": 12},
         },
         "legend": {"orientation": "h", "y": 1.02, "yanchor": "bottom", "x": 0, "font": {"color": t["text2"]}},
-        "xaxis": axis(t),
+        "xaxis": xaxis(t),
         "yaxis": axis(t),
         "hovermode": "x unified",
         "separators": ", ",

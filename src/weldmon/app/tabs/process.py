@@ -22,16 +22,19 @@ EXPLANATIONS = [
         "les mesures que l'IA en extrait image par image.",
     ),
     point(
-        "Le statut",
-        "la première carte indique d'un coup d'œil l'état du procédé à l'instant affiché : tir en cours, alarme "
-        "(voile rouge) ou veille (laser éteint).",
+        "Tir laser",
+        "indique d'un coup d'œil si le laser tire à l'instant affiché (« Tir en cours ») ou non (« À l'arrêt »).",
     ),
     point(
-        "Les anneaux",
-        "chaque anneau montre la part de la limite atteinte. Il vire au doré à l'approche de la limite et au "
-        "rouge au-delà d'un seuil d'alarme. Limites : vitesse ±10 % de la consigne (alarme à ±20 % pendant "
-        "5 ms), plasma au-delà de son seuil d'alarme, instabilité au 90ᵉ centile des 81 soudures, 4 "
-        "projections visibles à la fois (rafale).",
+        "Intégrité",
+        "compte les seuils franchis depuis l'allumage : pics de plasma, rafales de projections, écarts de "
+        "vitesse. L'anneau va de 0 à 15 et suit les seuils du verdict : violet jusqu'à 10 (OK), doré jusqu'à 15 "
+        "(OK avec warning), rouge au-delà ou dès un écart de vitesse (NOK).",
+    ),
+    point(
+        "Puissance et vitesse",
+        "consigne de puissance et vitesse d'avance mesurée à l'image. L'anneau de vitesse montre l'écart à la "
+        "consigne : il vire au doré à l'approche de ±10 % et au rouge en cas d'alarme (±20 % pendant 5 ms).",
     ),
     point(
         "Les masques IA",
@@ -60,9 +63,6 @@ KPIS = [
     # (clé, libellé, unité)
     ("power", "Puissance", "W"),
     ("speed", "Vitesse", "mm/s"),
-    ("plasma", "Plasma", "mm²"),
-    ("stab", "Instabilité", "%"),
-    ("spatter", "Projections", ""),
 ]
 CHARTS = ["plasma", "speed", "spatter", "weld"]
 SHORT_LABELS = {
@@ -118,35 +118,65 @@ def kpi_card(key: str, label: str, unit: str) -> html.Div:
     )
 
 
-def status_card() -> html.Div:
+def laser_card() -> html.Div:
+    """Tir laser : seulement « Tir en cours » ou « À l'arrêt »."""
     return html.Div(
-        id="status-card",
+        id="laser-card",
         className="status-card is-standby",
         **{"role": "status", "aria-live": "polite"},
         children=[
-            html.Div("Statut", className="status-label"),
+            html.Div("Tir laser", className="status-label"),
             html.Div(
                 className="status-main",
                 children=[
                     html.Span(className="status-dot", **{"aria-hidden": "true"}),
-                    icon("triangle-alert", 26),
-                    html.Span("En veille", id="status-text", className="status-text"),
+                    html.Span("À l'arrêt", id="laser-text", className="status-text"),
                 ],
             ),
-            html.Div("", id="status-detail", className="status-detail"),
+            html.Div("", id="laser-detail", className="status-detail"),
         ],
     )
 
 
-def chart_panel(key: str, title, height: int, legend=None) -> html.Div:
+def integrity_card() -> html.Div:
+    """Intégrité : seuils franchis depuis l'allumage, anneau de 0 à 15 qui suit les seuils du verdict."""
+    return html.Div(
+        className="kpi-card integrity-card",
+        children=[
+            html.Div(
+                className="integrity-top",
+                children=[
+                    html.Div(id="ring-integrity", className="ring", style={"--p": 0}, **{"aria-hidden": "true"}),
+                    html.Div(
+                        className="kpi-body",
+                        children=[
+                            html.Div("Intégrité", className="kpi-label"),
+                            html.Div(
+                                [
+                                    html.Span("0", id="kpi-integrity", className="kpi-num"),
+                                    html.Span("seuils franchis", className="kpi-unit"),
+                                ],
+                                className="kpi-value",
+                            ),
+                        ],
+                    ),
+                ],
+            ),
+            html.Div("", id="kpi-integrity-sub", className="kpi-sub"),
+        ],
+    )
+
+
+def chart_panel(key: str, title, legend=None) -> html.Div:
     return html.Div(
         className=f"panel chart-panel chart-{key}",
         children=[
             html.Div([html.H3(title, className="panel-title"), legend], className="panel-head"),
             dcc.Graph(
                 id=f"live-{key}",
+                className="graph-fill",
                 config={"displayModeBar": False, "responsive": True},
-                style={"height": f"{height}px"},
+                style={"height": "100%"},
             ),
         ],
     )
@@ -274,32 +304,36 @@ def layout() -> html.Div:
                 children=[
                     html.Div(
                         className="proc-left",
-                        children=[
-                            player(),
-                            html.Div(id="run-params", className="panel params"),
-                            html.Div(
-                                className="panel events-panel",
-                                children=[
-                                    html.Div(
-                                        [
-                                            html.H3("Journal d'événements", className="panel-title"),
-                                            html.Span(id="events-count", className="muted small"),
-                                        ],
-                                        className="panel-head",
-                                    ),
-                                    html.Ul(id="events-log", className="events"),
-                                ],
-                            ),
-                        ],
+                        children=[player(), html.Div(id="run-params", className="panel params")],
                     ),
                     html.Div(
                         className="proc-right",
                         children=[
-                            html.Div([status_card(), *(kpi_card(*k) for k in KPIS)], className="kpi-grid"),
+                            html.Div(
+                                className="proc-top",
+                                children=[
+                                    html.Div(
+                                        [laser_card(), integrity_card(), *(kpi_card(*k) for k in KPIS)],
+                                        className="kpi-grid",
+                                    ),
+                                    html.Div(
+                                        className="panel events-panel",
+                                        children=[
+                                            html.Div(
+                                                [
+                                                    html.H3("Journal d'événements", className="panel-title"),
+                                                    html.Span(id="events-count", className="muted small"),
+                                                ],
+                                                className="panel-head",
+                                            ),
+                                            html.Ul(id="events-log", className="events"),
+                                        ],
+                                    ),
+                                ],
+                            ),
                             chart_panel(
                                 "plasma",
                                 ["Panache de plasma", html.Span(" · mm²", className="muted")],
-                                300,
                                 html.Span(
                                     [
                                         legend_item("lg-line", "moyenne 2 ms"),
@@ -315,11 +349,11 @@ def layout() -> html.Div:
                             html.Div(
                                 className="chart-row",
                                 children=[
-                                    chart_panel("speed", ["Vitesse", html.Span(" · mm/s", className="muted")], 170),
+                                    chart_panel("speed", ["Vitesse", html.Span(" · mm/s", className="muted")]),
                                     chart_panel(
-                                        "spatter", ["Projections", html.Span(" · visibles", className="muted")], 170
+                                        "spatter", ["Projections", html.Span(" · visibles", className="muted")]
                                     ),
-                                    chart_panel("weld", ["Cordon soudé", html.Span(" · mm", className="muted")], 170),
+                                    chart_panel("weld", ["Cordon soudé", html.Span(" · mm", className="muted")]),
                                 ],
                             ),
                         ],
@@ -355,7 +389,7 @@ def chart_layouts(run: dict, ts: dict, scheme) -> dict:
             shapes=list(shapes),
             annotations=list(annotations),
         )
-        lay["xaxis"] = theme.axis(t, range=[0, duration], showgrid=False, nticks=7, fixedrange=True)
+        lay["xaxis"] = theme.xaxis(t, range=[0, duration], nticks=7, fixedrange=True)
         if x_title:
             lay["xaxis"]["title"] |= {"text": x_title, "standoff": 6}
         lay["yaxis"] = theme.axis(t, range=y_range, nticks=nticks, showline=False, ticks="", fixedrange=True)
@@ -449,6 +483,8 @@ def live_payload(run_id: str, scheme: str | None) -> dict:
             "speed_warn_pct": quality["speed_warn_pct"],
             "stab": quality["stability_limit_cv"],
             "burst": rules["spatter_burst_count"],
+            "ok_max": quality["verdict_ok_max_alarms"],
+            "warn_max": quality["verdict_warn_max_alarms"],
         },
         "colors": {k: t[k] for k in ("line", "line_raw", "fill", "cursor", "ring", "gold", "alarm", "surface")},
         "ts": {
@@ -480,7 +516,7 @@ def params_table(run: dict) -> list:
         ("Énergie linéique", f"{fmt(run['line_energy_j_mm'])} J/mm"),
         ("Défocalisation", f"{'+' if run['defocus_mm'] > 0 else ''}{fmt(run['defocus_mm'])} mm"),
         ("PFO Y", f"{run['pfo_y_mm']:.0f} mm · {fmt(run['inclination_deg'])}°"),
-        ("Caméra", f"{fmt(run['fps'], 0)} im/s · {run['n_frames']} images · {run['duration_ms']:.0f} ms"),
+        ("Caméra", f"{fmt(run['fps'], 0)} im/s · {run['duration_ms']:.0f} ms"),
         (
             "Enregistré le",
             f"{run['recorded_at'][8:10]}/{run['recorded_at'][5:7]}/{run['recorded_at'][:4]} "
@@ -581,12 +617,12 @@ clientside_callback(
     ClientsideFunction("weld", "tick"),
     *[Output(f"live-{k}", "figure") for k in CHARTS],
     Output("live-hud", "children"),
-    Output("status-card", "className"),
-    Output("status-text", "children"),
-    Output("status-detail", "children"),
+    Output("laser-card", "className"),
+    Output("laser-text", "children"),
+    Output("laser-detail", "children"),
     *[
         o
-        for k, *_ in KPIS
+        for k in ["integrity", *(k for k, *_ in KPIS)]
         for o in (Output(f"kpi-{k}", "children"), Output(f"kpi-{k}-sub", "children"), Output(f"ring-{k}", "style"))
     ],
     Output("events-log", "children"),

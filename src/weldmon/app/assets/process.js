@@ -9,13 +9,15 @@
   "use strict";
 
   const state = { key: null, run: null, videoRun: null, idx: -1, advancing: false, resume: null, rate: 1, p: null };
-  const KPIS = ["power", "speed", "plasma", "stab", "spatter"]; // même ordre que KPIS (tabs/process.py)
+  const KPIS = ["integrity", "power", "speed"]; // même ordre que les sorties du tick (tabs/process.py)
   const N_OUTPUTS = 4 + 1 + 3 + 3 * KPIS.length + 3;
   const HOLD_MS = 3; // une alarme reste affichée 3 ms de procédé
   const nf = (v, d) =>
     v === null || v === undefined || Number.isNaN(v)
       ? "—"
-      : Number(v).toLocaleString("fr-FR", { minimumFractionDigits: d, maximumFractionDigits: d });
+      : Number(v)
+          .toLocaleString("fr-FR", { minimumFractionDigits: d, maximumFractionDigits: d })
+          .replace(/\u202f/g, "\u00a0"); // espace fine absente de la police Sora
 
   const el = (type, props) => ({ type, namespace: "dash_html_components", props });
   const video = () => document.getElementById("live-video");
@@ -150,14 +152,15 @@
     return p.events.filter((e) => e.start <= idx && idx <= e.end + hold && !["on", "off"].includes(e.type));
   }
 
-  function statusAt(p, idx, alarms) {
+  // Tir laser : uniquement « Tir en cours » ou « À l'arrêt ».
+  function laserAt(p, idx) {
     const on = p.events.find((e) => e.type === "on");
-    if (!p.ts.on[idx]) {
-      const before = !on || idx < on.start;
-      return ["status-card is-standby", "En veille", before ? "En attente d'allumage" : "Soudure terminée"];
+    if (p.ts.on[idx]) {
+      const since = on ? p.ts.t_ms[idx] - on.t_ms : null;
+      return ["status-card is-firing", "Tir en cours", since != null ? "depuis " + nf(since, 1) + " ms" : ""];
     }
-    if (alarms.length) return ["status-card is-alarm", "Alarme", alarms[alarms.length - 1].short];
-    return ["status-card is-firing", "Tir en cours", "Aucune alarme"];
+    const before = !on || idx < on.start;
+    return ["status-card is-standby", "À l'arrêt", before ? "en attente d'allumage" : "soudure terminée"];
   }
 
   function kpis(p, idx, alarms) {
@@ -167,29 +170,27 @@
     const on = Boolean(ts.on[idx]);
     const speed = ts.speed_mm_s[idx];
     const dev = speed != null ? (100 * (speed - p.setpoint.speed)) / p.setpoint.speed : null;
-    const plasma = on ? ts.plasma_mm2[idx] : 0;
-    const cv = ts.plasma_cv[idx];
-    const n = ts.spatter_n[idx];
     const speedAlarm = alarms.some((e) => e.type === "speed_deviation");
-
     const rSpeed = dev != null ? Math.abs(dev) / L.speed_warn_pct : 0;
-    const rPlasma = L.plasma ? plasma / L.plasma : 0;
-    const rStab = cv != null ? cv / L.stab : 0;
-    const rSpatter = n / L.burst;
+
+    // Intégrité : seuils franchis depuis l'allumage ; couleur selon les seuils du verdict.
+    const past = p.events.filter((e) => e.start <= idx);
+    const n = (type) => past.filter((e) => e.type === type).length;
+    const plasma = n("plasma_spike");
+    const bursts = n("spatter_burst");
+    const speedDev = n("speed_deviation");
+    const alarmsCount = plasma + bursts;
+    const total = alarmsCount + speedDev;
+    const integrityColor =
+      speedDev || alarmsCount > L.warn_max ? c.alarm : alarmsCount > L.ok_max ? c.gold : c.ring;
     return [
+      [String(total), plasma + " plasma · " + bursts + " projections · " + speedDev + " vitesse", ring(total / L.warn_max, integrityColor)],
       [on ? nf(p.setpoint.power, 0) : "0", on ? "consigne" : "laser coupé", ring(on ? 1 : 0, c.ring)],
       [
         speed != null ? nf(speed, 0) : "—",
         dev != null ? (dev >= 0 ? "+" : "−") + nf(Math.abs(dev), 0) + " % / consigne" : on ? "mesure en cours" : "à l'arrêt",
         ring(rSpeed, ringColor(c, rSpeed, speedAlarm)),
       ],
-      [
-        nf(plasma, 1),
-        on && L.plasma ? Math.round(100 * rPlasma) + " % du seuil" : "éteint",
-        ring(rPlasma, ringColor(c, rPlasma, rPlasma >= 1)),
-      ],
-      [cv != null ? nf(100 * cv, 0) : "—", "sur 5 ms", ring(rStab, ringColor(c, rStab, false))],
-      [String(n), n > 1 ? "visibles" : "visible", ring(rSpatter, ringColor(c, rSpatter, rSpatter >= 1))],
     ];
   }
 
@@ -353,7 +354,7 @@
         return [
           ...figures(p, idx),
           hud,
-          ...statusAt(p, idx, alarms),
+          ...laserAt(p, idx),
           ...kpis(p, idx, alarms).flat(),
           eventItems(p, idx),
           shown + " / " + p.events.length,

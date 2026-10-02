@@ -22,28 +22,18 @@
         const cls = (classes || []).join("") || "none";
         const show = cls === "none" ? "none" : null;
         k = Math.max(0, Math.min(N_FRAMES - 1, k | 0));
-        let a, b, capA, capB;
-        if (view === "compare") {
-          a = url(run, k, show || "gt", cls === "none" ? "wps" : cls, alpha);
-          b = url(run, k, show || "pred", cls === "none" ? "wps" : cls, alpha);
-          capA = "Annotation (SAM2 + relecture humaine)";
-          capB = "Prédiction du modèle U-Net";
-        } else {
-          const src = show || view;
-          a = url(run, k, src, cls === "none" ? "wps" : cls, alpha);
-          b = "";
-          capA = {
-            gt: "Annotation (SAM2 + relecture humaine)",
-            pred: "Prédiction du modèle U-Net",
-            diff: "Pixels où annotation et modèle divergent",
-          }[view];
-          capB = "";
-        }
+        // À gauche l'annotation ; à droite la prédiction ou la carte des désaccords.
+        const masks = cls === "none" ? "wps" : cls;
+        const a = url(run, k, show || "gt", masks, alpha);
+        const b = url(run, k, view === "diff" ? "diff" : show || "pred", masks, alpha);
+        const capA = "Annotation (SAM2 + relecture humaine)";
+        const capB =
+          view === "diff" ? "Désaccords : pixels où annotation et modèle divergent" : "Prédiction du modèle U-Net";
         const t = figs ? figs.t_ms[k] : null;
         const label = figs ? "t = " + nf(t, 2) + " ms · frame " + (figs.frames[k] + 1) : "";
         return [
           a, b, capA, capB,
-          view === "compare" ? {} : { display: "none" },
+          {},
           label,
           figs ? withCursor(figs.areas, t, figs.muted) : window.dash_clientside.no_update,
           figs ? withCursor(figs.iou, t, figs.muted) : window.dash_clientside.no_update,
