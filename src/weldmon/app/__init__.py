@@ -200,7 +200,7 @@ def create_app() -> Dash:
             children=[
                 header(),
                 navbar(),
-                dmc.AppShellMain(className="main", children=[sections()]),
+                dmc.AppShellMain(className="main", children=html.Div(sections(), className="canvas", id="canvas")),
                 dcc.Store(id="goto"),
             ],
         ),
