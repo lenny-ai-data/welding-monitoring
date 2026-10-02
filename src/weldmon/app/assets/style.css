@@ -445,9 +445,27 @@ body {
 
 /* En-tête de section + explications ------------------------------------------------------------ */
 .sections {
+  box-sizing: border-box;
   max-width: 1680px;
   margin: 0 auto;
   padding: 8px 10px 0;
+}
+/* Canevas : sur grand écran, les pages sont dessinées pour 1920 × 1080 (contenu de 1648 px de large)
+   puis mises à l'échelle d'un bloc (transform, que Plotly sait compenser pour le survol ; --fit, --cx et
+   la hauteur réservée sont calculés dans nav.js). Les proportions restent identiques en plein écran, en
+   fenêtre ou sur un écran plus grand, sans barre de défilement. */
+@media (min-width: 1200px) {
+  .canvas {
+    height: var(--canvas-h, auto);
+    overflow: hidden;
+  }
+  .sections {
+    width: 1648px;
+    max-width: none;
+    margin: 0;
+    transform: translateX(var(--cx, 0px)) scale(var(--fit, 1));
+    transform-origin: top left;
+  }
 }
 .section-header {
   margin-bottom: 16px;
@@ -843,7 +861,7 @@ body {
 /* La colonne vidéo est dimensionnée sur la hauteur d'écran : en plein écran (1920 × 1080), toute la
    page tient sans défilement, quel que soit le nombre d'événements. */
 .proc-grid {
-  --proc-video: max(360px, min(calc(100vh - 440px), calc(44vw - 100px), 680px));
+  --proc-video: 39%;
   display: grid;
   grid-template-columns: var(--proc-video) minmax(0, 1fr);
   gap: 16px;
