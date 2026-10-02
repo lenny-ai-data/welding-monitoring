@@ -53,7 +53,7 @@ def layout() -> html.Div:
                                 id="doe-kpi",
                                 label="Indicateur",
                                 data=kpi_opts,
-                                value="spatter_mean",
+                                value="weld_width_mm",
                                 allowDeselect=False,
                                 w=320,
                             ),
