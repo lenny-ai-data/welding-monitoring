@@ -23,7 +23,7 @@ from scipy.signal import savgol_filter
 from scipy.stats import theilslopes
 
 PLASMA_SMOOTH_MS = 2.0  # moyenne glissante causale affichée sur le plasma
-PLASMA_MIN_PX = 30  # aire minimale (px à 512) pour considérer le plasma présent
+PLASMA_MIN_PX = 150  # aire minimale (px à 512, ~0,2 mm²) pour considérer le plasma présent
 ON_WINDOW_MS = 1.5  # fenêtre de lissage de la détection allumage / extinction
 SPEED_WINDOW_MS = 20.0  # fenêtre de la pente glissante (régression locale d'ordre 1)
 STAB_WINDOW_MS = 5.0  # fenêtre du coefficient de variation glissant du plasma
@@ -32,6 +32,7 @@ SPEED_ALARM_MS = 5.0  # durée minimale d'un écart de vitesse pour lever une al
 SPIKE_SIGMA = 3.0
 FRONT_GATE_PX = 60  # écart maximal front du cordon / centre du panache (px à 512, ~2 mm)
 FRONT_MEDIAN_MS = 1.5  # fenêtre de la médiane glissante sur le front
+FRONT_END_TOL_PX = 4  # le front est « arrivé » à moins de 4 px de sa position finale
 
 
 def frames_for(ms: float, fps: int, odd: bool = False) -> int:
@@ -39,16 +40,29 @@ def frames_for(ms: float, fps: int, odd: bool = False) -> int:
     return n + 1 if odd and n % 2 == 0 else n
 
 
-def detect_on_off(plasma_px: np.ndarray, fps: int) -> tuple[int, int] | None:
+def detect_on_off(plasma_px: np.ndarray, fps: int, front: np.ndarray | None = None) -> tuple[int, int] | None:
     """Fenêtre laser ON : premier et dernier instant où le plasma est présent sur la majorité
-    d'une fenêtre glissante (robuste aux scintillements d'une frame)."""
+    d'une fenêtre glissante (robuste aux scintillements d'une frame).
+
+    Si la position du front du cordon est fournie, l'extinction est bornée par l'instant où le front
+    atteint sa position finale : une lueur résiduelle (cratère, reflet) après la fin du cordon ne
+    prolonge pas la phase ON."""
     present = (plasma_px >= PLASMA_MIN_PX).astype(float)
     win = frames_for(ON_WINDOW_MS, fps)
     frac = pd.Series(present).rolling(win, center=True, min_periods=1).mean().to_numpy()
     idx = np.nonzero(frac > 0.5)[0]
     if len(idx) == 0:
         return None
-    return int(idx[0]), int(idx[-1])
+    on, off = int(idx[0]), int(idx[-1])
+    if front is not None and np.isfinite(front[on:]).sum() > 10:
+        # Position finale : quasi-maximum du front (la fin de vidéo peut être masquée par une fausse
+        # détection de plasma qui invalide le front).
+        final = np.nanpercentile(front[on:], 99)
+        if np.isfinite(final):
+            reached = np.nonzero(front[on:] >= final - FRONT_END_TOL_PX)[0]
+            if len(reached):
+                off = min(off, on + int(reached[0]) + frames_for(ON_WINDOW_MS, fps))
+    return on, off
 
 
 def front_slope(frames: np.ndarray, front_px: np.ndarray) -> tuple[float, float]:
@@ -86,11 +100,12 @@ def calibrate(runs: pd.DataFrame, feats: pd.DataFrame) -> tuple[dict, pd.DataFra
     rows = []
     for run in runs.itertuples():
         f = feats[feats.run_id == run.run_id].sort_values("frame")
-        window = detect_on_off(f.plasma_px.to_numpy(), run.fps)
+        front = clean_front(f, run.fps)
+        window = detect_on_off(f.plasma_px.to_numpy(), run.fps, front)
         if window is None:
             continue
         sl = steady_slice(*window)
-        slope, r2 = front_slope(f.frame.to_numpy()[sl], clean_front(f, run.fps)[sl])
+        slope, r2 = front_slope(f.frame.to_numpy()[sl], front[sl])
         rows.append(
             {
                 "run_id": run.run_id,
@@ -136,12 +151,12 @@ def run_signals(run, f: pd.DataFrame, scale: float, spatter_burst: int) -> tuple
     frame = f.frame.to_numpy()
     t_ms = frame / fps * 1000
     plasma_px = f.plasma_px.to_numpy().astype(float)
-    window = detect_on_off(plasma_px, fps)
+    front = clean_front(f, fps)
+    window = detect_on_off(plasma_px, fps, front)
     on, off = window if window else (n, n)
     is_on = (frame >= on) & (frame <= off)
 
     # Front du cordon robustifié, interpolé sur la phase ON, lissé puis dérivé.
-    front = clean_front(f, fps)
     speed = np.full(n, np.nan)
     sg = frames_for(SPEED_WINDOW_MS, fps, odd=True)
     valid = is_on & ~np.isnan(front)
@@ -259,8 +274,8 @@ def main() -> None:
     # pendant les phases laser ON, sur l'ensemble du dataset.
     on_counts = []
     for run in runs.itertuples():
-        f = feats[feats.run_id == run.run_id]
-        w = detect_on_off(f.plasma_px.to_numpy(), run.fps)
+        f = feats[feats.run_id == run.run_id].sort_values("frame")
+        w = detect_on_off(f.plasma_px.to_numpy(), run.fps, clean_front(f, run.fps))
         if w:
             on_counts.append(f.spatter_n.to_numpy()[w[0] : w[1] + 1])
     spatter_burst = max(3, int(np.quantile(np.concatenate(on_counts), 0.99)))

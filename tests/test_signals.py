@@ -52,3 +52,14 @@ def test_spatter_instance_matching():
     counts = instance_matches(gt, pred)
     assert counts == {"n_pred": 2, "tp_pred": 1, "n_gt": 2, "tp_gt": 1}
     assert f1(counts)["f1"] == pytest.approx(0.5)
+
+
+def test_off_bounded_by_weld_front_arrival(signals):
+    plasma = np.zeros(600)
+    plasma[100:500] = 2000  # lueur résiduelle jusqu'à 500 alors que le cordon s'arrête vers 400
+    front = np.full(600, np.nan)
+    front[100:400] = np.linspace(40, 460, 300)
+    front[400:] = 460
+    on, off = signals.detect_on_off(plasma, fps=6000, front=front)
+    assert abs(on - 100) <= 2
+    assert 395 <= off <= 410
