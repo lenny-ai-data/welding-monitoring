@@ -14,9 +14,8 @@ import cv2
 import numpy as np
 import pandas as pd
 import torch
-
 from common import APP_DATA, LABELED_RUNS, MODELS, PLAYBACK_FPS, PROCESSED, SIZE, video_path
-from segmodel import load_model, to_tensor
+from segmodel import load_model, suppress_static, to_tensor
 
 DEVICE = "cuda"
 BATCH = 32
@@ -58,9 +57,14 @@ def frame_features(img: np.ndarray, lab: np.ndarray) -> dict:
     f["plasma_px"] = int(plasma.sum())
     if f["plasma_px"]:
         ys, xs = np.nonzero(plasma)
-        f |= {"plasma_cx": float(xs.mean()), "plasma_cy": float(ys.mean()),
-              "plasma_top": int(ys.min()), "plasma_h": int(ys.max() - ys.min() + 1),
-              "plasma_w": int(xs.max() - xs.min() + 1), "plasma_gray": float(img[plasma].mean())}
+        f |= {
+            "plasma_cx": float(xs.mean()),
+            "plasma_cy": float(ys.mean()),
+            "plasma_top": int(ys.min()),
+            "plasma_h": int(ys.max() - ys.min() + 1),
+            "plasma_w": int(xs.max() - xs.min() + 1),
+            "plasma_gray": float(img[plasma].mean()),
+        }
 
     n, _, stats, _ = cv2.connectedComponentsWithStats((lab == 3).astype(np.uint8), connectivity=8)
     areas = stats[1:, cv2.CC_STAT_AREA]
@@ -72,18 +76,46 @@ def frame_features(img: np.ndarray, lab: np.ndarray) -> dict:
     f["weld_px"] = int(weld.sum())
     cols = np.nonzero(weld.sum(0) >= 3)[0]  # colonnes réellement couvertes par le cordon
     if len(cols):
-        f |= {"weld_x0": int(cols.min()), "weld_x1": int(cols.max()),
-              "weld_width_px": float(weld[:, cols].sum() / len(cols))}
+        f |= {
+            "weld_x0": int(cols.min()),
+            "weld_x1": int(cols.max()),
+            "weld_width_px": float(weld[:, cols].sum() / len(cols)),
+        }
     return f
 
 
 def write_overlay_video(run_id: str, frames: np.ndarray, labels: np.ndarray) -> None:
     dst = APP_DATA / "media" / "videos" / f"{run_id}_ia.mp4"
     proc = subprocess.Popen(
-        ["ffmpeg", "-v", "error", "-y", "-f", "rawvideo", "-pix_fmt", "bgr24",
-         "-s", f"{SIZE}x{SIZE}", "-r", str(PLAYBACK_FPS), "-i", "-",
-         "-c:v", "libx264", "-preset", "slow", "-crf", "28", "-g", str(PLAYBACK_FPS),
-         "-pix_fmt", "yuv420p", "-movflags", "+faststart", str(dst)],
+        [
+            "ffmpeg",
+            "-v",
+            "error",
+            "-y",
+            "-f",
+            "rawvideo",
+            "-pix_fmt",
+            "bgr24",
+            "-s",
+            f"{SIZE}x{SIZE}",
+            "-r",
+            str(PLAYBACK_FPS),
+            "-i",
+            "-",
+            "-c:v",
+            "libx264",
+            "-preset",
+            "slower",
+            "-crf",
+            "33",
+            "-g",
+            str(PLAYBACK_FPS),
+            "-pix_fmt",
+            "yuv420p",
+            "-movflags",
+            "+faststart",
+            str(dst),
+        ],
         stdin=subprocess.PIPE,
     )
     for img, lab in zip(frames, labels, strict=True):
@@ -93,8 +125,7 @@ def write_overlay_video(run_id: str, frames: np.ndarray, labels: np.ndarray) -> 
             tint[lab == cid] = color
         out = cv2.addWeighted(tint, ALPHA, bgr, 1 - ALPHA, 0)
         for cid, color in OVERLAY.items():  # contours pleins pour que les petites projections ressortent
-            contours, _ = cv2.findContours((lab == cid).astype(np.uint8), cv2.RETR_EXTERNAL,
-                                           cv2.CHAIN_APPROX_SIMPLE)
+            contours, _ = cv2.findContours((lab == cid).astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
             cv2.drawContours(out, contours, -1, color, 1, lineType=cv2.LINE_AA)
         proc.stdin.write(out.tobytes())
     proc.stdin.close()
@@ -122,7 +153,7 @@ def main() -> None:
             if k + 2 < len(run_ids):
                 pending.append(pool.submit(decode, run_ids[k + 2]))
             t0 = time.time()
-            labels = segment(model, frames)
+            labels = suppress_static(segment(model, frames))
             feats = [frame_features(img, lab) for img, lab in zip(frames, labels, strict=True)]
             rows.extend({"run_id": run_id, "frame": i, **f} for i, f in enumerate(feats))
             write_overlay_video(run_id, frames, labels)

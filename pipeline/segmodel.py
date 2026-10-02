@@ -30,3 +30,21 @@ def load_model(path, device: str = "cuda") -> torch.nn.Module:
     model = build_model(pretrained=False)
     model.load_state_dict(torch.load(path, map_location=device, weights_only=True))
     return model.to(device).eval()
+
+
+# Fraction de frames au-delà de laquelle une détection immobile est rejetée : le panache et les
+# projections se déplacent, un reflet ou une rayure fixe non. Corrige les faux positifs dus aux
+# différences d'éclairage entre séries (le modèle n'a vu que DoE3).
+STATIC_FRACTION = {2: 0.35, 3: 0.08}
+
+
+def suppress_static(labels: np.ndarray) -> np.ndarray:
+    """labels (N, H, W) -> mêmes cartes sans les détections plasma / projections immobiles."""
+    out = labels.copy()
+    for cid, frac in STATIC_FRACTION.items():
+        static = (labels == cid).mean(0) > frac
+        if static.any():
+            region = out[:, static]
+            region[region == cid] = 0
+            out[:, static] = region
+    return out
