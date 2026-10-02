@@ -1,0 +1,30 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  qualite:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.11.23"
+          enable-cache: true
+      - name: Dépendances (app + analyse + dev, sans torch)
+        run: uv sync --frozen --group analysis --group dev
+      - name: Lint
+        run: uv run ruff check . && uv run ruff format --check .
+      - name: Tests
+        # Les tests HTTP de l'app sont ignorés sans app_data/ (artefacts générés hors dépôt).
+        run: uv run pytest -q
+      - name: Audit des dépendances runtime
+        run: |
+          uv export --frozen --no-dev --no-default-groups --no-emit-project --format requirements-txt > requirements.txt
+          uvx pip-audit -r requirements.txt --strict --disable-pip --no-deps

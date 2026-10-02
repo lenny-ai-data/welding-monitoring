@@ -1,0 +1,41 @@
+# Exemple de déploiement : app durcie derrière Caddy (TLS automatique).
+#   DOMAIN=demo.mondomaine.fr docker compose up -d
+services:
+  app:
+    image: ghcr.io/lenny-ai-data/laser-welding-monitor:latest
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 512m
+    cpus: 1.0
+    pids_limit: 128
+    environment:
+      WELDMON_CONTACT_URL: "https://www.linkedin.com/in/lenny-jacquinot-ai-engineer/"
+      # Seul Caddy (réseau interne du compose) peut joindre l'app.
+      FORWARDED_ALLOW_IPS: "*"
+    expose: ["8050"]
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on: [app]
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      DOMAIN: ${DOMAIN:?définir DOMAIN, ex. demo.mondomaine.fr}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    cap_drop: [ALL]
+    cap_add: [NET_BIND_SERVICE]
+    security_opt: ["no-new-privileges:true"]
+
+volumes:
+  caddy_data:
+  caddy_config:
