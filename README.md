@@ -86,7 +86,7 @@ make app                  # http://127.0.0.1:8050
 ## Image Docker & sécurité
 
 ```bash
-make docker               # image ghcr.io/lenny-ai-data/laser-welding-monitor
+make docker               # image ghcr.io/lenny-ai-data/welding-monitoring
 make docker-run           # lancement durci en local
 make scan                 # Trivy (CRITICAL/HIGH) + pip-audit
 ```

@@ -133,3 +133,9 @@ def test_history_detail_renders_every_run():
 
     for r in data.runs():
         assert history.detail(r)
+
+
+def test_doe_factor_constants_match_data():
+    from weldmon.app.tabs import doe
+
+    assert list(doe.FACTORS) == list(data.doe()["factors"])

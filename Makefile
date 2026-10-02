@@ -1,6 +1,6 @@
 # Laser Welding Process Monitor : orchestration du pipeline et de l'image
 PY := uv run --group pipeline python
-IMAGE ?= ghcr.io/lenny-ai-data/laser-welding-monitor
+IMAGE ?= ghcr.io/lenny-ai-data/welding-monitoring
 # Trivy épinglé par digest (outil de sécurité : jamais de tag flottant).
 TRIVY := aquasec/trivy:0.75.0@sha256:af6acf9a6b85dfe389a1941505c0ce9efef52a4719635e1a962f022a3d855daa
 TAG ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)

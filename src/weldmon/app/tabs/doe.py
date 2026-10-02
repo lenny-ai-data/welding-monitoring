@@ -35,6 +35,9 @@ EXPLANATIONS = [
 ]
 
 GRID = 41
+# Les 4 facteurs du plan Box-Behnken (clés de doe.json) : constantes pour que le module s'importe
+# sans app_data/ (CI, tests unitaires), les callbacks étant déclarés à l'import.
+FACTORS = ("P", "v", "f", "y")
 
 
 def factor_value(run: dict, key: str) -> float:
@@ -451,7 +454,7 @@ def spc_fig(kpi_key: str, scheme) -> dict:
 @callback(
     Output("doe-surface", "figure"),
     Output("doe-pareto", "figure"),
-    *[Output(f"doe-main-{k}", "figure") for k in data.doe()["factors"]],
+    *[Output(f"doe-main-{k}", "figure") for k in FACTORS],
     Output("doe-spc", "figure"),
     Output("doe-fit", "children"),
     Output("doe-surface-title", "children"),
@@ -478,7 +481,7 @@ def update(kpi_key, fx, fy, scheme):
     return (
         surface_fig(kpi_key, fx, fy, scheme),
         pareto_fig(kpi_key, scheme),
-        *main_effects(kpi_key, scheme).values(),
+        *(main_effects(kpi_key, scheme)[k] for k in FACTORS),
         spc_fig(kpi_key, scheme),
         badges,
         title,

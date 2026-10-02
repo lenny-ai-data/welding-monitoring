@@ -2,7 +2,7 @@
 #   DOMAIN=demo.mondomaine.fr docker compose up -d
 services:
   app:
-    image: ghcr.io/lenny-ai-data/laser-welding-monitor:latest
+    image: ghcr.io/lenny-ai-data/welding-monitoring:latest
     restart: unless-stopped
     read_only: true
     tmpfs:
