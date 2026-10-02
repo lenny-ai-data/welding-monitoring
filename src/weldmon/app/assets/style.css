@@ -73,7 +73,9 @@ body {
 }
 .header-inner {
   height: 100%;
-  max-width: 1680px;
+  /* Même largeur utile et mêmes marges que .sections : titre aligné sur le contenu des pages. */
+  box-sizing: border-box;
+  max-width: calc(1680px + 32px);
   margin: 0 auto;
   padding: 0 16px;
   display: flex;
@@ -88,6 +90,7 @@ body {
   min-width: 0;
 }
 .brand-mark {
+  display: block;
   width: 34px;
   height: 34px;
   border-radius: 10px;
@@ -147,43 +150,137 @@ body {
 .icon-info { --icon: url("icons/info.svg"); }
 .icon-sun { --icon: url("icons/sun.svg"); }
 .icon-moon { --icon: url("icons/moon.svg"); }
+.icon-mail { --icon: url("icons/mail.svg"); }
+.icon-panel-left-close { --icon: url("icons/panel-left-close.svg"); }
+.icon-panel-left-open { --icon: url("icons/panel-left-open.svg"); }
 
 /* Barre latérale ---------------------------------------------------------------------------------- */
 .navbar {
   background: var(--surface);
   border-right: 1px solid var(--border);
-  padding: 14px 10px;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
+  overflow: hidden;
+}
+.nav-top {
+  height: 64px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 19px;
+  border-bottom: 1px solid var(--border);
 }
 .nav-links {
+  flex: 1;
   display: flex;
   flex-direction: column;
+  align-items: stretch;
   gap: 4px;
+  padding: 14px 10px;
+}
+/* L'infobulle enveloppe le lien dans un div « width: fit-content » (style en ligne) : on l'étire
+   pour que le lien occupe toute la largeur de la barre. */
+.nav-links > div {
+  width: 100% !important;
 }
 .nav-link {
+  width: 100%;
   border-radius: 10px;
   font-weight: 500;
   color: var(--text-2);
+  white-space: nowrap;
 }
 .nav-link[data-active] {
   color: var(--text);
   box-shadow: inset 3px 0 0 var(--weld);
 }
-.nav-footer {
-  font-size: 12px;
-  line-height: 1.6;
-  padding: 10px 8px;
+.nav-bottom {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 10px 14px;
   border-top: 1px solid var(--border);
 }
-.nav-footer a {
-  color: var(--text-2);
-  text-decoration: none;
+.nav-contact {
+  padding: 4px 6px 0;
 }
-.nav-footer a:hover {
-  color: var(--text);
-  text-decoration: underline;
+.nav-contact-title {
+  font-weight: 600;
+  font-size: 13.5px;
+  margin-bottom: 4px;
+}
+.nav-contact p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-2);
+}
+.nav-cta {
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 9px 12px !important;
+  font-size: 13.5px;
+  white-space: nowrap;
+}
+.nav-cta .icon {
+  color: #fff;
+  flex: none;
+}
+.nav-collapse {
+  align-self: flex-end;
+  color: var(--text-2);
+}
+.nav-collapse .icon-panel-left-open {
+  display: none;
+}
+
+/* Mobile : le menu s'ouvre sous l'en-tête, pour garder le burger (fermeture) accessible. */
+@media (max-width: 47.99em) {
+  .navbar {
+    top: 64px !important;
+    height: calc(100dvh - 64px) !important;
+  }
+  .nav-top {
+    display: none;
+  }
+}
+
+/* Barre repliée (bureau uniquement) : icônes seules, infobulles au survol. */
+@media (min-width: 48em) {
+  .nav-collapsed .nav-text,
+  .nav-collapsed .nav-link .mantine-NavLink-body {
+    display: none;
+  }
+  .nav-collapsed .nav-link {
+    width: 44px;
+    height: 40px;
+    margin: 0 auto;
+    justify-content: center;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+  .nav-collapsed .nav-link .mantine-NavLink-section {
+    margin: 0 !important;
+  }
+  .nav-collapsed .nav-cta {
+    width: 44px;
+    height: 40px;
+    padding: 0 !important;
+    align-self: center;
+  }
+  .nav-collapsed .nav-collapse {
+    align-self: center;
+  }
+  .nav-collapsed .nav-collapse .icon-panel-left-open {
+    display: inline-block;
+  }
+  .nav-collapsed .nav-collapse .icon-panel-left-close {
+    display: none;
+  }
 }
 
 /* En-tête de section + explications -------------------------------------------------------------- */
@@ -517,18 +614,6 @@ body {
 }
 .about a {
   color: var(--plasma);
-}
-.cta {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  flex-wrap: wrap;
-  background: linear-gradient(120deg, color-mix(in srgb, var(--weld) 14%, var(--surface)), var(--surface) 60%);
-}
-.cta p {
-  margin: 0;
-  color: var(--text-2);
 }
 .cta-button {
   display: inline-block;

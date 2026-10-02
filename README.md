@@ -9,9 +9,12 @@ l'occasion (cordon, plasma, projections) et sur l'analyse du plan d'expériences
 | Onglet | Contenu |
 |---|---|
 | **Monitoring live** | Vidéo synchronisée avec 5 pistes (puissance, vitesse consigne/mesurée, plasma, projections, cordon). Indicateurs instantanés, alarmes, journal d'événements, mode « ligne de production » qui enchaîne les runs dans l'ordre réel de soudage. |
-| **Vidéo & masques IA** | Annotation humaine vs prédiction du U-Net, frame par frame (côte à côte ou carte des désaccords). Métriques sur les vidéos d'évaluation, comparaison avec une baseline de vision classique. |
+| **Segmentation IA** | Annotation humaine vs prédiction du U-Net, frame par frame (côte à côte ou carte des désaccords). Métriques sur les vidéos d'évaluation, comparaison avec une baseline de vision classique. |
 | **Analyse DoE** | Surfaces de réponse quadratiques, effets standardisés, effets principaux, carte de contrôle I-MR des résidus, énergie linéique. |
 | **Méthode & sources** | Chaîne de traitement, statut de chaque signal (mesuré / consigne / modélisé), étalonnage, licence. |
+
+Navigation par barre latérale repliable (icônes seules), liens directs `#live`, `#seg`, `#doe`, `#about`, et un
+bandeau « Infos et explications » dans chaque section pour un public non spécialiste.
 
 ## Ce que l'on montre — et ce que l'on ne prétend pas
 

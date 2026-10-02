@@ -164,7 +164,7 @@ def layout() -> html.Div:
         className="tab-body",
         children=[
             section_header(
-                "Vidéo & masques IA",
+                "Segmentation IA",
                 "Comment l'IA « voit » une soudure : son analyse comparée, image par image, à celle d'experts humains.",
                 EXPLANATIONS,
             ),
