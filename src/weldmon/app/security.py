@@ -63,9 +63,10 @@ def install(app, script_hashes: list[str]) -> None:
         resp.headers["Permissions-Policy"] = (
             "camera=(), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()"
         )
-        resp.headers["Cross-Origin-Opener-Policy"] = "same-origin"
         resp.headers["Cross-Origin-Resource-Policy"] = "same-origin"
         if request.is_secure:
+            # COOP et HSTS n'ont d'effet qu'en HTTPS (en HTTP le navigateur ignore COOP et le signale).
+            resp.headers["Cross-Origin-Opener-Policy"] = "same-origin"
             resp.headers["Strict-Transport-Security"] = "max-age=63072000; includeSubDomains"
         return resp
 
