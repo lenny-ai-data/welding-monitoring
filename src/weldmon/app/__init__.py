@@ -9,7 +9,7 @@ from . import security, theme
 from .components import icon
 from .tabs import about, doe, history, process, segmentation
 
-TITLE = "Weld Process Monitor | Lenny Jacquinot"
+TITLE = "Monitoring Soudage | Lenny Jacquinot"
 CONTACT_URL = os.environ.get("WELDMON_CONTACT_URL", "https://www.linkedin.com/in/lenny-jacquinot-ai-engineer/")
 DESCRIPTION = (
     "Monitoring de production d'une soudure laser : suivi qualité de 81 soudures réelles, relecture "
@@ -19,13 +19,13 @@ DESCRIPTION = (
 
 SECTIONS = [
     # (clé, libellé, icône Lucide, constructeur)
-    ("suivi", "Suivi & historique", "layout-grid", history.layout),
     ("process", "Monitoring process", "activity", process.layout),
-    ("seg", "Segmentation IA", "scan-eye", segmentation.layout),
+    ("suivi", "Suivi & historique", "layout-grid", history.layout),
     ("analyses", "Analyses", "chart-column", doe.layout),
-    ("about", "Méthode & sources", "book-open", about.layout),
+    ("seg", "Segmentation IA", "scan-eye", segmentation.layout),
+    ("about", "Méthode", "book-open", about.layout),
 ]
-DEFAULT_SECTION = "suivi"
+DEFAULT_SECTION = "process"
 NAV_WIDTH = {"expanded": 240, "collapsed": 72}
 
 
@@ -224,6 +224,5 @@ clientside_callback(
     Input("nav-burger", "opened"),
     Input("nav-collapse", "n_clicks"),
     Input("goto", "data"),
-    Input("crumb-suivi", "n_clicks"),
     State("app-shell", "navbar"),
 )

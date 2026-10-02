@@ -177,7 +177,21 @@ body {
   height: 28px;
 }
 
-/* Barre latérale ------------------------------------------------------------------------------ */
+/* Barre latérale ------------------------------------------------------------------------------
+   Repli animé : seule la largeur change (barre et marge du contenu, en transition) ; les icônes ne
+   bougent pas, les libellés s'effacent en fondu, le logo complet laisse place au symbole. */
+:root {
+  --nav-t: 240ms;
+  --nav-e: cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+.mantine-AppShell-navbar.navbar {
+  transition-property: transform, top, height, width;
+  transition-duration: var(--nav-t);
+  transition-timing-function: var(--nav-e);
+}
+.mantine-AppShell-main.main {
+  transition: padding-inline-start var(--nav-t) var(--nav-e);
+}
 .navbar {
   background: var(--surface-2);
   border-right: 1px solid var(--border);
@@ -186,22 +200,50 @@ body {
   overflow: hidden;
 }
 .nav-top {
-  height: 76px;
+  position: relative;
   flex: none;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 0 12px 0 22px;
+  height: 76px;
   margin: 0 12px 8px;
-  padding-left: 10px;
   border-bottom: 1px solid var(--border);
+  transition: height var(--nav-t) var(--nav-e);
+}
+.nav-top .wordmark {
+  position: absolute;
+  left: 10px;
+  top: 16px;
+  transition: opacity 160ms ease;
 }
 .nav-mark {
-  display: none;
+  position: absolute;
+  left: 50%;
+  top: 18px;
   height: 34px;
   width: auto;
-  margin: 0 auto;
+  transform: translateX(-50%);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 160ms ease;
+}
+/* Filet entre le symbole et le bouton de dépliement (barre repliée uniquement). */
+.nav-top::after {
+  content: "";
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  top: 66px;
+  border-top: 1px solid var(--border);
+  opacity: 0;
+  transition: opacity 160ms ease;
+}
+.nav-top .nav-collapse {
+  position: absolute;
+  top: 21px;
+  left: calc(100% - 34px);
+  color: var(--muted);
+  transition: left var(--nav-t) var(--nav-e), top var(--nav-t) var(--nav-e);
+}
+.nav-collapse .icon-panel-left-open {
+  display: none;
 }
 .nav-links {
   flex: 1;
@@ -218,9 +260,13 @@ body {
 .nav-link {
   width: 100%;
   min-height: 42px;
+  padding-left: 15px !important;
   border-radius: 10px;
   color: var(--muted);
   white-space: nowrap;
+}
+.nav-link .mantine-NavLink-body {
+  transition: opacity 160ms ease;
 }
 .nav-link:hover {
   background: color-mix(in srgb, var(--brand-soft) 60%, transparent);
@@ -242,12 +288,20 @@ body {
   padding: 12px;
 }
 .nav-contact {
+  max-height: 170px;
+  overflow: hidden;
   padding: 14px 14px 2px;
   border: 1px solid var(--border);
   border-bottom: 0;
   border-radius: 14px 14px 0 0;
   background: var(--surface);
   margin-bottom: -10px;
+  transition:
+    max-height var(--nav-t) var(--nav-e),
+    padding var(--nav-t) var(--nav-e),
+    margin var(--nav-t) var(--nav-e),
+    opacity 160ms ease,
+    border-color 160ms ease;
 }
 .nav-contact-title {
   display: flex;
@@ -257,6 +311,7 @@ body {
   font-size: 13px;
   line-height: 1.3;
   margin-bottom: 6px;
+  min-width: 190px;
 }
 .nav-contact-mark {
   height: 30px;
@@ -268,6 +323,7 @@ body {
   font-size: 12px;
   line-height: 1.5;
   color: var(--muted);
+  min-width: 190px;
 }
 .btn-primary {
   display: inline-flex;
@@ -309,14 +365,23 @@ body {
   display: flex !important;
   width: 100%;
   box-sizing: border-box;
+  padding: 0 14px;
   border-radius: 0 0 14px 14px;
+  transition: border-radius var(--nav-t) var(--nav-e), gap var(--nav-t) var(--nav-e), background 0.15s;
 }
+.nav-cta .nav-text {
+  display: inline-block;
+  max-width: 170px;
+  overflow: hidden;
+  transition: max-width var(--nav-t) var(--nav-e), opacity 160ms ease;
+}
+/* La bascule de thème est calée pour rester centrée une fois la barre repliée (72 px). */
 .nav-tools {
   display: flex;
   align-items: center;
+  padding-left: 7px;
 }
-.nav-tools .mantine-ActionIcon-root,
-.nav-collapse {
+.nav-tools .mantine-ActionIcon-root {
   color: var(--muted);
 }
 
@@ -331,44 +396,21 @@ body {
   }
 }
 
-/* Barre repliée (bureau uniquement) : logo réduit, icônes seules, infobulles au survol. */
+/* Barre repliée (bureau uniquement) : symbole, filet, bouton de dépliement, icônes seules. */
 @media (min-width: 48em) {
   .nav-collapsed .nav-top {
-    height: auto;
-    flex-direction: column;
-    justify-content: center;
-    gap: 10px;
-    padding: 18px 0 12px;
-    margin: 0 10px 8px;
+    height: 124px;
   }
   .nav-collapsed .nav-top .wordmark {
-    display: none;
+    opacity: 0;
   }
-  .nav-collapsed .nav-mark {
-    display: block;
+  .nav-collapsed .nav-mark,
+  .nav-collapsed .nav-top::after {
+    opacity: 1;
   }
-  .nav-collapsed .nav-text,
-  .nav-collapsed .nav-link .mantine-NavLink-body {
-    display: none;
-  }
-  .nav-collapsed .nav-link {
-    width: 44px;
-    margin: 0 auto;
-    justify-content: center;
-    padding-left: 0 !important;
-    padding-right: 0 !important;
-  }
-  .nav-collapsed .nav-link .mantine-NavLink-section {
-    margin: 0 !important;
-  }
-  .nav-collapsed .nav-cta {
-    width: 44px;
-    padding: 0;
-    align-self: center;
-    border-radius: 10px;
-  }
-  .nav-collapsed .nav-tools {
-    justify-content: center;
+  .nav-collapsed .nav-top .nav-collapse {
+    top: 78px;
+    left: calc(50% - 17px);
   }
   .nav-collapsed .nav-collapse .icon-panel-left-open {
     display: inline-block;
@@ -376,9 +418,29 @@ body {
   .nav-collapsed .nav-collapse .icon-panel-left-close {
     display: none;
   }
+  .nav-collapsed .nav-link .mantine-NavLink-body {
+    opacity: 0;
+  }
+  .nav-collapsed .nav-contact {
+    max-height: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    margin-bottom: 0;
+    opacity: 0;
+    border-color: transparent;
+  }
+  .nav-collapsed .nav-cta {
+    gap: 0;
+    padding: 0;
+    border-radius: 10px;
+  }
+  .nav-collapsed .nav-cta .nav-text {
+    max-width: 0;
+    opacity: 0;
+  }
 }
-.nav-collapse .icon-panel-left-open {
-  display: none;
+@media (prefers-reduced-motion: reduce) {
+  :root { --nav-t: 0ms; }
 }
 
 /* En-tête de section + explications ------------------------------------------------------------ */
@@ -523,6 +585,9 @@ body {
 }
 .strong {
   font-weight: 600;
+}
+.pre-line {
+  white-space: pre-line;
 }
 
 /* Verdicts ------------------------------------------------------------------------------------- */
@@ -1009,15 +1074,16 @@ body {
    son contenu n'influe pas sur la hauteur, quel que soit le nombre d'événements). */
 .proc-top {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-columns: auto minmax(0, 1fr);
   gap: 16px;
 }
 .proc-top .events-panel {
   contain: size;
 }
+/* Cartes de taille fixe : mêmes proportions quelle que soit la largeur de fenêtre. */
 .kpi-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(2, 232px);
   grid-auto-rows: 1fr;
   gap: 12px;
 }
@@ -1465,6 +1531,7 @@ body {
 }
 @media (max-width: 1599px) {
   .proc-top { grid-template-columns: minmax(0, 1fr); }
+  .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .proc-top .events-panel { contain: none; height: 180px; }
 }
 @media (max-width: 1180px) {

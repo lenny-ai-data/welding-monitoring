@@ -13,42 +13,24 @@ from ..components import point, section_header
 
 EXPLANATIONS = [
     point(
-        "Le plan d'expériences (DoE)",
-        "plutôt que de tester toutes les combinaisons de réglages, on choisit un petit nombre d'essais bien "
-        "répartis (plan Box-Behnken : 27 essais) pour étudier 4 réglages : la puissance du laser, la vitesse "
-        "d'avance, la défocalisation (hauteur du point focal) et la translation PFO (inclinaison du faisceau). "
-        "Le plan a été répété 3 fois : séries DoE1, DoE2 et DoE3, soit 81 soudures.",
-    ),
-    point(
-        "Les indicateurs",
-        "chaque soudure est résumée par des mesures issues de la vision IA : taille et stabilité du plasma, "
-        "projections, largeur du cordon, écart de vitesse. Choisissez-en un dans la liste.",
+        "L'étude de sensibilité",
+        "permet d'évaluer l'impact d'un paramètre sur les indicateurs cible à partir une matrice d'essais "
+        "portant ici sur 4 paramètres (puissance, vitesse, défocalisation et PFO).",
     ),
     point(
         "La surface de réponse",
-        "un modèle statistique prédit l'indicateur pour toute combinaison de deux réglages (les deux autres au "
-        "milieu de leur plage). Couleurs chaudes = valeurs élevées ; les points sont les essais réellement faits "
-        "(valeur mesurée au survol).",
+        "un modèle statistique prédit l'indicateur pour toute combinaison de deux paramètres (les deux autres au "
+        "milieu de leur plage).",
     ),
     point(
         "Les effets standardisés",
-        "quels réglages ont un impact statistiquement démontré (barres violettes, au-delà du seuil p = 0,05) et "
+        "quels paramètres ont un impact statistiquement démontré (barres violettes, au-delà du seuil p = 0,05) et "
         "lesquels se confondent avec le bruit de mesure (barres grises).",
     ),
     point(
-        "Les effets principaux",
-        "comment l'indicateur varie en moyenne lorsqu'on change un seul réglage ; les barres d'erreur traduisent "
-        "l'incertitude.",
-    ),
-    point(
         "La carte de contrôle",
-        "ce que les réglages n'expliquent pas, soudure après soudure dans l'ordre chronologique : un point hors "
-        "des limites rouges (±2,66 × étendue mobile moyenne) signale un essai anormal, à investiguer.",
-    ),
-    point(
-        "Le facteur « série »",
-        "un facteur de bloc qui absorbe les écarts entre campagnes (réglages machine, éclairage, cadrage). Il "
-        "évite de biaiser les effets des quatre réglages du plan.",
+        "ce que les paramètres n'expliquent pas, soudure après soudure dans l'ordre chronologique : un point hors "
+        "des limites rouges signale un essai anormal ou une dérive à investiguer.",
     ),
 ]
 
@@ -89,7 +71,7 @@ def layout() -> html.Div:
         children=[
             section_header(
                 "Analyses",
-                "Quels réglages influencent la qualité ? Modèles ajustés sur les 81 soudures, à réévaluer en production.",
+                "Etude de sensibilité : quels paramètres influencent la qualité de soudure ?",
                 EXPLANATIONS,
                 aside=[
                     dmc.Select(

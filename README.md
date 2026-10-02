@@ -9,13 +9,13 @@ plasma, projections) et sur l'analyse statistique du plan d'expériences Box-Beh
 
 | Onglet | Contenu |
 |---|---|
-| **Suivi & historique** | Verdict qualité de chaque soudure (OK / OK avec warning / NOK, d'après ses alarmes), campagne la plus récente en premier, filtres par verdict, courbe des alarmes dans l'ordre de production, détail d'une soudure et ouverture dans le monitoring. |
 | **Monitoring process** | Relecture d'une soudure (ralentie ×200) : lecteur avec lecture / pause et timeline des événements, cartes tir laser, intégrité (seuils franchis, anneau qui suit les seuils du verdict), puissance et vitesse, journal d'événements, courbes plasma / vitesse (bande ±10 %) / projections / cordon, enchaînement des soudures dans l'ordre réel. Tient sans défilement en plein écran 1920 × 1080. |
-| **Segmentation IA** | Annotation humaine à gauche, prédiction du U-Net ou carte des désaccords à droite, image par image. Métriques sur les vidéos d'évaluation, comparaison avec une baseline de vision classique. |
+| **Suivi & historique** | Verdict qualité de chaque soudure (OK / OK avec warning / NOK, d'après ses alarmes), campagne la plus récente en premier, filtres par verdict, courbe des alarmes dans l'ordre de production, détail d'une soudure et ouverture dans le monitoring. |
 | **Analyses** | Surfaces de réponse quadratiques, effets standardisés, effets principaux, carte de contrôle I-MR des résidus, à réévaluer au fil de la production. |
-| **Méthode & sources** | Chaîne de traitement, modèle de segmentation, statut de chaque signal (mesuré / consigne / calculé / modélisé), licence. |
+| **Segmentation IA** | Annotation humaine à gauche, prédiction du U-Net ou carte des désaccords à droite, image par image. Métriques sur les vidéos d'évaluation, comparaison avec une baseline de vision classique. |
+| **Méthode** | Chaîne de traitement, modèle de segmentation, statut de chaque signal (mesuré / consigne / calculé / modélisé), licence. |
 
-Navigation par barre latérale repliable (icônes seules), liens directs `#suivi`, `#process`, `#seg`, `#analyses`,
+Navigation par barre latérale repliable (icônes seules), liens directs `#process`, `#suivi`, `#analyses`, `#seg`,
 `#about`, et un bandeau « Infos et explications » dans chaque section pour un public non spécialiste.
 
 **Verdict d'une soudure** : OK jusqu'à 10 alarmes (pics de plasma + rafales de projections), OK avec warning
