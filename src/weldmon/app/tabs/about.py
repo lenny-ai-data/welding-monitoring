@@ -181,6 +181,10 @@ def layout() -> html.Div:
                         ]
                     ),
                     html.P(["Modifications : ", ds["changes"]], className="muted small"),
+                    html.P(
+                        "Démonstrateur réalisé à titre personnel, sans usage commercial des données.",
+                        className="muted small",
+                    ),
                 ],
             ),
         ],

@@ -135,7 +135,6 @@ body {
 .icon-info { --icon: url("icons/info.svg"); }
 .icon-sun { --icon: url("icons/sun.svg"); }
 .icon-moon { --icon: url("icons/moon.svg"); }
-.icon-mail { --icon: url("icons/mail.svg"); }
 .icon-panel-left-close { --icon: url("icons/panel-left-close.svg"); }
 .icon-panel-left-open { --icon: url("icons/panel-left-open.svg"); }
 .icon-layers { --icon: url("icons/layers.svg"); }
@@ -146,18 +145,51 @@ body {
 .icon-triangle-alert { --icon: url("icons/triangle-alert.svg"); }
 .icon-arrow-right { --icon: url("icons/arrow-right.svg"); }
 
-/* Logo : une version par thème. */
-.wordmark img {
+/* Profil de l'auteur (photo ronde, nom, accroche) : lien vers LinkedIn. */
+.profile {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  color: var(--text);
+  text-decoration: none;
+  border-radius: 12px;
+}
+.profile:focus-visible {
+  outline: 2px solid var(--line);
+  outline-offset: 2px;
+}
+.profile-photo {
+  flex: none;
   display: block;
+  width: 44px;
   height: 44px;
-  width: auto;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px var(--surface-2), 0 0 0 3px var(--brand-soft-border);
+  transition: box-shadow 160ms ease;
 }
-.wordmark-on-light,
-[data-mantine-color-scheme="light"] .wordmark-on-dark {
-  display: none !important;
+.profile:hover .profile-photo {
+  box-shadow: 0 0 0 2px var(--surface-2), 0 0 0 3px var(--brand);
 }
-[data-mantine-color-scheme="light"] .wordmark-on-light {
-  display: block !important;
+.profile-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  white-space: nowrap;
+  transition: opacity 160ms ease;
+}
+.profile-name {
+  font-weight: 600;
+  font-size: 14.5px;
+  line-height: 1.3;
+}
+.profile:hover .profile-name {
+  color: var(--brand-text);
+}
+.profile-tagline {
+  font-size: 11.5px;
+  line-height: 1.35;
+  color: var(--muted);
 }
 
 /* En-tête (mobile) --------------------------------------------------------------------------- */
@@ -173,13 +205,20 @@ body {
   justify-content: space-between;
   gap: 12px;
 }
-.header .wordmark img {
-  height: 28px;
+.header .profile {
+  gap: 10px;
+}
+.header .profile-photo {
+  width: 34px;
+  height: 34px;
+}
+.header .profile-name {
+  font-size: 13.5px;
 }
 
 /* Barre latérale ------------------------------------------------------------------------------
    Repli animé : seule la largeur change (barre et marge du contenu, en transition) ; les icônes ne
-   bougent pas, les libellés s'effacent en fondu, le logo complet laisse place au symbole. */
+   bougent pas, les libellés s'effacent en fondu, seule la photo du profil reste visible. */
 :root {
   --nav-t: 240ms;
   --nav-e: cubic-bezier(0.2, 0.7, 0.2, 1);
@@ -200,50 +239,13 @@ body {
   overflow: hidden;
 }
 .nav-top {
-  position: relative;
   flex: none;
+  display: flex;
+  align-items: center;
   height: 76px;
   margin: 0 12px 8px;
+  padding-left: 2px;
   border-bottom: 1px solid var(--border);
-  transition: height var(--nav-t) var(--nav-e);
-}
-.nav-top .wordmark {
-  position: absolute;
-  left: 10px;
-  top: 16px;
-  transition: opacity 160ms ease;
-}
-.nav-mark {
-  position: absolute;
-  left: 50%;
-  top: 18px;
-  height: 34px;
-  width: auto;
-  transform: translateX(-50%);
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 160ms ease;
-}
-/* Filet entre le symbole et le bouton de dépliement (barre repliée uniquement). */
-.nav-top::after {
-  content: "";
-  position: absolute;
-  left: 6px;
-  right: 6px;
-  top: 66px;
-  border-top: 1px solid var(--border);
-  opacity: 0;
-  transition: opacity 160ms ease;
-}
-.nav-top .nav-collapse {
-  position: absolute;
-  top: 21px;
-  left: calc(100% - 34px);
-  color: var(--muted);
-  transition: left var(--nav-t) var(--nav-e), top var(--nav-t) var(--nav-e);
-}
-.nav-collapse .icon-panel-left-open {
-  display: none;
 }
 .nav-links {
   flex: 1;
@@ -280,50 +282,31 @@ body {
 .nav-link .mantine-NavLink-label {
   font-size: 13.5px;
 }
+/* Bas de barre : bascule de thème à gauche, bouton de repli à droite. Une fois la barre repliée
+   (72 px), le bouton de repli passe sous la bascule ; les deux restent centrés. */
 .nav-bottom {
+  position: relative;
   flex: none;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 12px;
+  height: 60px;
+  margin: 0 12px;
+  border-top: 1px solid var(--border);
+  transition: height var(--nav-t) var(--nav-e);
 }
-.nav-contact {
-  max-height: 170px;
-  overflow: hidden;
-  padding: 14px 14px 2px;
-  border: 1px solid var(--border);
-  border-bottom: 0;
-  border-radius: 14px 14px 0 0;
-  background: var(--surface);
-  margin-bottom: -10px;
-  transition:
-    max-height var(--nav-t) var(--nav-e),
-    padding var(--nav-t) var(--nav-e),
-    margin var(--nav-t) var(--nav-e),
-    opacity 160ms ease,
-    border-color 160ms ease;
-}
-.nav-contact-title {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-weight: 600;
-  font-size: 13px;
-  line-height: 1.3;
-  margin-bottom: 6px;
-  min-width: 190px;
-}
-.nav-contact-mark {
-  height: 30px;
-  width: auto;
-  flex: none;
-}
-.nav-contact p {
-  margin: 0 0 12px;
-  font-size: 12px;
-  line-height: 1.5;
+.nav-bottom .mantine-ActionIcon-root {
+  position: absolute;
   color: var(--muted);
-  min-width: 190px;
+}
+.nav-bottom > :first-child {
+  top: 13px;
+  left: 7px;
+}
+.nav-bottom .nav-collapse {
+  top: 13px;
+  left: calc(100% - 41px);
+  transition: left var(--nav-t) var(--nav-e), top var(--nav-t) var(--nav-e);
+}
+.nav-collapse .icon-panel-left-open {
+  display: none;
 }
 .btn-primary {
   display: inline-flex;
@@ -357,34 +340,6 @@ body {
   outline: 2px solid var(--line);
   outline-offset: 2px;
 }
-/* Le bouton contact est enveloppé par son infobulle (div « fit-content ») : on l'étire aussi. */
-.nav-bottom > div:has(> .nav-cta) {
-  width: 100% !important;
-}
-.nav-cta {
-  display: flex !important;
-  width: 100%;
-  box-sizing: border-box;
-  padding: 0 14px;
-  border-radius: 0 0 14px 14px;
-  transition: border-radius var(--nav-t) var(--nav-e), gap var(--nav-t) var(--nav-e), background 0.15s;
-}
-.nav-cta .nav-text {
-  display: inline-block;
-  max-width: 170px;
-  overflow: hidden;
-  transition: max-width var(--nav-t) var(--nav-e), opacity 160ms ease;
-}
-/* La bascule de thème est calée pour rester centrée une fois la barre repliée (72 px). */
-.nav-tools {
-  display: flex;
-  align-items: center;
-  padding-left: 7px;
-}
-.nav-tools .mantine-ActionIcon-root {
-  color: var(--muted);
-}
-
 /* Mobile : le menu s'ouvre sous l'en-tête, pour garder le burger (fermeture) accessible. */
 @media (max-width: 47.99em) {
   .navbar {
@@ -396,21 +351,17 @@ body {
   }
 }
 
-/* Barre repliée (bureau uniquement) : symbole, filet, bouton de dépliement, icônes seules. */
+/* Barre repliée (bureau uniquement) : photo seule, icônes seules, bouton de dépliement sous la bascule. */
 @media (min-width: 48em) {
-  .nav-collapsed .nav-top {
-    height: 124px;
-  }
-  .nav-collapsed .nav-top .wordmark {
+  .nav-collapsed .profile-text {
     opacity: 0;
   }
-  .nav-collapsed .nav-mark,
-  .nav-collapsed .nav-top::after {
-    opacity: 1;
+  .nav-collapsed .nav-bottom {
+    height: 104px;
   }
-  .nav-collapsed .nav-top .nav-collapse {
-    top: 78px;
-    left: calc(50% - 17px);
+  .nav-collapsed .nav-bottom .nav-collapse {
+    top: 57px;
+    left: 7px;
   }
   .nav-collapsed .nav-collapse .icon-panel-left-open {
     display: inline-block;
@@ -419,23 +370,6 @@ body {
     display: none;
   }
   .nav-collapsed .nav-link .mantine-NavLink-body {
-    opacity: 0;
-  }
-  .nav-collapsed .nav-contact {
-    max-height: 0;
-    padding-top: 0;
-    padding-bottom: 0;
-    margin-bottom: 0;
-    opacity: 0;
-    border-color: transparent;
-  }
-  .nav-collapsed .nav-cta {
-    gap: 0;
-    padding: 0;
-    border-radius: 10px;
-  }
-  .nav-collapsed .nav-cta .nav-text {
-    max-width: 0;
     opacity: 0;
   }
 }

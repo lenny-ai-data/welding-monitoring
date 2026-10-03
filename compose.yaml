@@ -13,7 +13,6 @@ services:
     cpus: 1.0
     pids_limit: 128
     environment:
-      WELDMON_CONTACT_URL: "https://www.linkedin.com/in/lenny-jacquinot-ai-engineer/"
       # Seul Caddy (réseau interne du compose) peut joindre l'app.
       FORWARDED_ALLOW_IPS: "*"
     expose: ["8050"]
