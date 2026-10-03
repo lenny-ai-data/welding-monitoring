@@ -1,7 +1,11 @@
-"""Construit la table des 81 runs : plan Box-Behnken (xlsx) + métadonnées caméra (.cihx).
+"""Étape 02 : construit la table des 81 runs, plan Box-Behnken (xlsx) et métadonnées caméra (.cihx).
 
 L'ordre d'exécution du xlsx liste les points d'essai dans l'ordre où ils ont été soudés ;
-il est recoupé avec l'horodatage des enregistrements Photron.
+il est recoupé avec l'horodatage des enregistrements Photron (corrélation affichée en console).
+
+Entrées : data/Laser_Welding_Dataset_Metadata.xlsx, data/interim/.../<run>.cihx
+Sorties : data/processed/runs.parquet (colonnes décrites dans docs/donnees.md)
+Usage   : make data (étapes 01 à 03)
 """
 
 import re
@@ -10,6 +14,8 @@ from datetime import datetime
 import pandas as pd
 from common import METADATA_XLSX, PROCESSED, cihx_path
 
+# Plan d'expériences (xlsx) ------------------------------------------------------------------------
+# Colonnes de la feuille Excel et nom retenu dans la table des runs.
 FACTOR_COLUMNS = {
     "Sampling point": "point",
     "Power [W]": "power_w",
@@ -21,6 +27,7 @@ FACTOR_COLUMNS = {
 
 
 def read_design(sheet: str) -> pd.DataFrame:
+    """Les 27 points d'une série (feuille DOE1, DOE2 ou DOE3) et leur rang de soudage."""
     raw = pd.read_excel(METADATA_XLSX, sheet_name=sheet, header=None)
     header = raw.iloc[0].tolist()
     design = raw.iloc[1:28].copy()
@@ -36,7 +43,11 @@ def read_design(sheet: str) -> pd.DataFrame:
     return design
 
 
+# Métadonnées caméra (.cihx) -----------------------------------------------------------------------
+
+
 def read_cihx(path) -> dict:
+    """Nombre de frames, cadence, exposition et horodatage, lus dans l'en-tête XML du fichier .cihx."""
     blob = path.read_bytes()
     xml = blob[blob.find(b"<?xml") :].decode("utf-8", "replace")
 
@@ -51,6 +62,9 @@ def read_cihx(path) -> dict:
         "recorded_at": recorded,
         "camera": tag("deviceName"),
     }
+
+
+# Table des runs -----------------------------------------------------------------------------------
 
 
 def build_runs() -> pd.DataFrame:
@@ -74,6 +88,9 @@ def check_order(runs: pd.DataFrame) -> None:
     for serie, grp in runs.groupby("serie"):
         rho = grp["exec_rank"].corr(grp["recorded_at"].rank(), method="spearman")
         print(f"{serie}: corrélation ordre déclaré / horodatage = {rho:.2f}")
+
+
+# Point d'entrée -----------------------------------------------------------------------------------
 
 
 def main() -> None:

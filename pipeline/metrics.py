@@ -7,12 +7,14 @@ IGNORE = 255
 
 
 def confusion(gt: np.ndarray, pred: np.ndarray, n_classes: int) -> np.ndarray:
+    """Matrice de confusion (lignes : annotation, colonnes : prédiction), pixels ignorés exclus."""
     valid = gt != IGNORE
     idx = gt[valid].astype(np.int64) * n_classes + pred[valid].astype(np.int64)
     return np.bincount(idx, minlength=n_classes**2).reshape(n_classes, n_classes)
 
 
 def iou_from_confusion(cm: np.ndarray) -> np.ndarray:
+    """IoU par classe ; NaN pour une classe absente de l'annotation comme de la prédiction."""
     inter = np.diag(cm).astype(float)
     union = cm.sum(0) + cm.sum(1) - inter
     with np.errstate(invalid="ignore", divide="ignore"):
@@ -20,6 +22,7 @@ def iou_from_confusion(cm: np.ndarray) -> np.ndarray:
 
 
 def components(mask: np.ndarray, min_px: int = 4) -> list[np.ndarray]:
+    """Composantes connexes d'un masque binaire, d'au moins min_px pixels."""
     n, lab, stats, _ = cv2.connectedComponentsWithStats(mask.astype(np.uint8), connectivity=8)
     return [lab == i for i in range(1, n) if stats[i, cv2.CC_STAT_AREA] >= min_px]
 
@@ -38,6 +41,7 @@ def instance_matches(gt_mask: np.ndarray, pred_mask: np.ndarray, min_px: int = 4
 
 
 def f1(counts: dict) -> dict:
+    """Précision, rappel et F1 à partir des comptages de instance_matches (cumulés sur plusieurs frames)."""
     precision = counts["tp_pred"] / counts["n_pred"] if counts["n_pred"] else 0.0
     recall = counts["tp_gt"] / counts["n_gt"] if counts["n_gt"] else 0.0
     score = 2 * precision * recall / (precision + recall) if precision + recall else 0.0

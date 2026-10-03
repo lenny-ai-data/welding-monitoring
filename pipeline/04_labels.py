@@ -1,8 +1,13 @@
-"""Normalise les 8 vidéos annotées en cartes de labels sémantiques 512 px.
+"""Étape 04 : normalise les 8 vidéos annotées en cartes de labels sémantiques 512 px.
 
 - schéma CSV commun (les exports SAM2 ont 18, 33 ou 46 colonnes) ;
-- mapping frame annotée -> frame vidéo reconstruit (round(linspace)) et vérifié ;
+- correspondance frame annotée / frame vidéo reconstruite (round(linspace)), vérifiée contre les tables du
+  dataset et par comparaison des pixels avec l'AVI décodé ;
 - fusion des instances par priorité spatter > plasma > weld, `dynamic_other` ignoré (255).
+
+Entrées : data/interim/Labels/, AVI des vidéos annotées, data/processed/runs.parquet
+Sorties : data/processed/labels/<run>/{frames,masks}/NNN.png, labeled_frames.parquet, label_instances.parquet
+Usage   : make labels
 """
 
 import cv2
@@ -19,8 +24,9 @@ from common import (
     video_path,
 )
 
-IGNORE = 255
-N_LABELED = 164
+# Paramètres ---------------------------------------------------------------------------------------
+IGNORE = 255  # pixels exclus de l'entraînement et de l'évaluation
+N_LABELED = 164  # frames annotées par vidéo, réparties uniformément (même valeur dans l'app)
 COMMON = [
     "frame_file",
     "frame_index",
@@ -38,13 +44,17 @@ COMMON = [
 PAINT_ORDER = ["dynamic_other", "weld", "plasma", "spatter"]  # le dernier peint gagne
 OUT = PROCESSED / "labels"
 
+# Lecture des annotations et de la vidéo -----------------------------------------------------------
+
 
 def run_root(run_id: str):
+    """Dossier d'annotations d'un run (sous-dossier train ou eval selon le dataset)."""
     split = "eval_ground_truth" if run_id in EVAL_RUNS else "training_labeled"
     return LABELS_DIR / split / run_dir_name(run_id)
 
 
 def video_frames(run_id: str, indices) -> dict[int, np.ndarray]:
+    """Frames de l'AVI aux index demandés, en niveaux de gris pleine résolution."""
     wanted, frames = set(indices), {}
     cap = cv2.VideoCapture(str(video_path(run_id)))
     i = 0
@@ -57,6 +67,9 @@ def video_frames(run_id: str, indices) -> dict[int, np.ndarray]:
         i += 1
     cap.release()
     return frames
+
+
+# Correspondance frames annotées / vidéo -----------------------------------------------------------
 
 
 def frame_mapping(run_id: str, n_video_frames: int) -> np.ndarray:
@@ -85,7 +98,11 @@ def check_pixels(run_id: str, mapping: np.ndarray) -> float:
     return float(np.mean(diffs))
 
 
+# Instances et cartes de labels --------------------------------------------------------------------
+
+
 def load_instances(run_id: str) -> pd.DataFrame:
+    """Instances annotées d'un run, ramenées au schéma commun (instances marquées « ignore » exclues)."""
     df = pd.read_csv(run_root(run_id) / "labels_final.csv")
     df = df[~df["ignore"].astype(bool)][COMMON].copy()
     df["mask_file"] = df["mask_path"].str.split("/").str[-1]
@@ -94,6 +111,7 @@ def load_instances(run_id: str) -> pd.DataFrame:
 
 
 def label_map(run_id: str, instances: pd.DataFrame) -> np.ndarray:
+    """Carte sémantique 512 px d'une frame : les masques d'instances sont peints dans PAINT_ORDER."""
     lab = np.zeros((SIZE, SIZE), np.uint8)
     for cls in PAINT_ORDER:
         for mask_file in instances.loc[instances.label == cls, "mask_file"]:
@@ -101,6 +119,9 @@ def label_map(run_id: str, instances: pd.DataFrame) -> np.ndarray:
             m = cv2.resize((m > 0).astype(np.float32), (SIZE, SIZE), interpolation=cv2.INTER_AREA) >= 0.5
             lab[m] = CLASS_IDS.get(cls, IGNORE)
     return lab
+
+
+# Point d'entrée -----------------------------------------------------------------------------------
 
 
 def main() -> None:

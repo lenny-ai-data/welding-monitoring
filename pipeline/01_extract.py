@@ -1,4 +1,12 @@
-"""Décompresse les archives Zenodo dans data/interim (idempotent)."""
+"""Étape 01 : décompresse les archives Zenodo dans data/interim/.
+
+Aucune transformation : data/interim/ est le contenu exact des archives et peut être supprimé puis recréé.
+Idempotent : un fichier déjà extrait avec la bonne taille est sauté.
+
+Entrées : data/Labels.zip, data/high_speed_camera_videos.zip
+Sorties : data/interim/Labels/, data/interim/high_speed_camera_videos/
+Usage   : make data (étapes 01 à 03)
+"""
 
 import zipfile
 

@@ -1,8 +1,16 @@
-"""Entraîne le U-Net (cordon / plasma / projections) puis l'évalue sur les 2 vidéos tenues à l'écart.
+"""Étape 05 : entraîne le U-Net (cordon / plasma / projections) puis l'évalue sur les 2 vidéos tenues à l'écart.
 
 Découpage par vidéo (jamais par frame, pour éviter les fuites entre frames voisines) :
 - train : 5 vidéos DoE3 annotées ; validation (choix du checkpoint) : DoE3_16 ;
 - évaluation finale : DoE3_19 et DoE3_23, jamais vues pendant l'entraînement.
+
+L'évaluation compare le modèle avec et sans post-traitement, et une baseline sans apprentissage
+(baseline_cv.py) dont le seuil est réglé sur les vidéos d'entraînement. Fiche complète : docs/modele.md.
+
+Entrées : data/processed/labels/
+Sorties : models/unet.pt (écrasé à chaque entraînement), models/history.csv, models/metrics.json
+Usage   : make train            entraînement puis évaluation (GPU CUDA, environ 15 min sur RTX 3090)
+          python 05_train_seg.py --eval-only    réévalue models/unet.pt sans l'écraser
 """
 
 import json
@@ -17,19 +25,23 @@ import segmentation_models_pytorch as smp
 import torch
 from common import CLASSES, EVAL_RUNS, MODELS, PROCESSED, TRAIN_RUNS
 from metrics import IGNORE, confusion, f1, instance_matches, iou_from_confusion
-from segmodel import ENCODER, N_CLASSES, build_model, load_model, suppress_static, to_tensor
+from segmodel import ENCODER, MEAN, N_CLASSES, STD, build_model, load_model, suppress_static, to_tensor
 from torch.utils.data import DataLoader, Dataset
 from torchvision import tv_tensors
 from torchvision.transforms import v2
 
+# Paramètres ---------------------------------------------------------------------------------------
 VAL_RUNS = ["DoE3_16"]
 FIT_RUNS = [r for r in TRAIN_RUNS if r not in VAL_RUNS]
 EPOCHS, BATCH, LR = 80, 8, 3e-4
 SEED = 42
 DEVICE = "cuda"
 
+# Données et augmentations -------------------------------------------------------------------------
+
 
 def load_run(run_id: str) -> tuple[np.ndarray, np.ndarray]:
+    """Frames (N, 512, 512) et cartes de labels (N, 512, 512) d'une vidéo annotée."""
     root = PROCESSED / "labels" / run_id
     frames = sorted((root / "frames").glob("*.png"))
     imgs = np.stack([cv2.imread(str(p), cv2.IMREAD_GRAYSCALE) for p in frames])
@@ -51,6 +63,8 @@ class RandomGamma(torch.nn.Module):
 
 
 class WeldFrames(Dataset):
+    """Frames annotées d'un ensemble de vidéos, augmentées si train=True."""
+
     def __init__(self, runs: list[str], train: bool):
         data = [load_run(r) for r in runs]
         self.imgs = np.concatenate([d[0] for d in data])
@@ -79,12 +93,16 @@ class WeldFrames(Dataset):
         mask = tv_tensors.Mask(torch.from_numpy(self.masks[i]))
         if self.aug:
             img, mask = self.aug(img, mask)
-        x = img.float().div(255.0).sub(0.45).div(0.25)
+        x = img.float().div(255.0).sub(MEAN).div(STD)  # même normalisation que segmodel.to_tensor
         return x, mask.long()
+
+
+# Prédiction et métriques --------------------------------------------------------------------------
 
 
 @torch.no_grad()
 def predict(model, imgs: np.ndarray, batch: int = 16) -> np.ndarray:
+    """Cartes de labels prédites, sans post-traitement."""
     out = []
     for i in range(0, len(imgs), batch):
         x = to_tensor(imgs[i : i + batch]).to(DEVICE)
@@ -94,6 +112,7 @@ def predict(model, imgs: np.ndarray, batch: int = 16) -> np.ndarray:
 
 
 def evaluate(gt: np.ndarray, pred: np.ndarray) -> dict:
+    """IoU par classe, mIoU, détection des projections par instance, corrélation des aires de plasma."""
     cm = confusion(gt, pred, N_CLASSES)
     iou = iou_from_confusion(cm)
     counts = {"n_pred": 0, "tp_pred": 0, "n_gt": 0, "tp_gt": 0}
@@ -110,7 +129,11 @@ def evaluate(gt: np.ndarray, pred: np.ndarray) -> dict:
     }
 
 
+# Baseline sans apprentissage ----------------------------------------------------------------------
+
+
 def baseline(runs: list[str], threshold: int) -> np.ndarray:
+    """Segmentation par soustraction de la première frame et seuillage (voir baseline_cv.py)."""
     preds = []
     for r in runs:
         imgs, _ = load_run(r)
@@ -127,7 +150,11 @@ def tune_baseline() -> int:
     return best
 
 
+# Entraînement -------------------------------------------------------------------------------------
+
+
 def train() -> torch.nn.Module:
+    """Entraîne depuis les poids ImageNet et renvoie le modèle du meilleur epoch (mIoU de validation)."""
     torch.manual_seed(SEED)
     np.random.seed(SEED)
     train_ds, val_ds = WeldFrames(FIT_RUNS, train=True), WeldFrames(VAL_RUNS, train=False)
@@ -170,6 +197,9 @@ def train() -> torch.nn.Module:
     model.load_state_dict(best_state)
     pd.DataFrame(history).to_csv(MODELS / "history.csv", index=False)
     return model
+
+
+# Point d'entrée -----------------------------------------------------------------------------------
 
 
 def main() -> None:
