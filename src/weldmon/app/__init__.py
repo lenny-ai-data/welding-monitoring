@@ -1,7 +1,5 @@
 """Laser Welding Process Monitor : application Dash."""
 
-import os
-
 import dash_mantine_components as dmc
 from dash import ALL, ClientsideFunction, Dash, Input, Output, State, clientside_callback, dcc, html
 
@@ -10,7 +8,9 @@ from .components import icon
 from .tabs import about, doe, history, process, segmentation
 
 TITLE = "Monitoring Soudage | Lenny Jacquinot"
-CONTACT_URL = os.environ.get("WELDMON_CONTACT_URL", "https://www.linkedin.com/in/lenny-jacquinot-ai-engineer/")
+AUTHOR = "Lenny Jacquinot"
+AUTHOR_TAGLINE = "IA & Data pour l'industrie"
+AUTHOR_URL = "https://www.linkedin.com/in/lenny-jacquinot-ai-engineer/"
 DESCRIPTION = (
     "Monitoring de production d'une soudure laser : suivi qualité de 81 soudures réelles, relecture "
     "image par image avec segmentation IA du plasma, des projections et du cordon, et analyses statistiques."
@@ -29,14 +29,25 @@ DEFAULT_SECTION = "process"
 NAV_WIDTH = {"expanded": 240, "collapsed": 72}
 
 
-def wordmark() -> html.Span:
-    """Logo : version claire sur fond sombre et inversement (bascule en CSS)."""
-    return html.Span(
-        className="wordmark",
+def profile() -> html.A:
+    """Photo et nom de l'auteur, lien vers son profil LinkedIn (texte masqué quand la barre est repliée)."""
+    return html.A(
+        className="profile",
+        href=AUTHOR_URL,
+        target="_blank",
+        rel="noopener noreferrer",
+        title=f"{AUTHOR} sur LinkedIn",
         children=[
-            html.Img(src="/assets/brand/wordmark-dark.png", alt="Lenny Jacquinot", className="wordmark-on-dark"),
-            html.Img(src="/assets/brand/wordmark-light.png", alt="Lenny Jacquinot", className="wordmark-on-light"),
+            html.Img(src="/assets/brand/avatar.jpg", alt="", className="profile-photo"),
+            html.Span(
+                className="profile-text",
+                children=[
+                    html.Span(AUTHOR, className="profile-name"),
+                    html.Span(AUTHOR_TAGLINE, className="profile-tagline"),
+                ],
+            ),
         ],
+        **{"aria-label": f"{AUTHOR}, {AUTHOR_TAGLINE} : profil LinkedIn"},
     )
 
 
@@ -62,7 +73,7 @@ def header() -> dmc.AppShellHeader:
             className="header-inner",
             children=[
                 dmc.Burger(id="nav-burger", opened=False, size="sm", **{"aria-label": "Ouvrir le menu"}),
-                wordmark(),
+                profile(),
                 theme_toggle("color-scheme-mobile"),
             ],
         ),
@@ -78,24 +89,7 @@ def navbar() -> dmc.AppShellNavbar:
     return dmc.AppShellNavbar(
         className="navbar",
         children=[
-            html.Div(
-                className="nav-top",
-                children=[
-                    wordmark(),
-                    html.Img(src="/assets/brand/mark.png", alt="Lenny Jacquinot", className="nav-mark"),
-                    dmc.ActionIcon(
-                        id="nav-collapse",
-                        variant="subtle",
-                        color="gray",
-                        size="lg",
-                        visibleFrom="sm",
-                        className="nav-collapse",
-                        n_clicks=0,
-                        children=[icon("panel-left-close", 18), icon("panel-left-open", 18)],
-                        **{"aria-label": "Replier / déplier le menu"},
-                    ),
-                ],
-            ),
+            html.Div(className="nav-top", children=profile()),
             html.Nav(
                 className="nav-links",
                 **{"aria-label": "Navigation principale"},
@@ -115,34 +109,21 @@ def navbar() -> dmc.AppShellNavbar:
                     for key, label, icon_name, _ in SECTIONS
                 ],
             ),
-            html.Div(
+            dmc.Box(
                 className="nav-bottom",
+                visibleFrom="sm",
                 children=[
-                    dmc.Box(html.Div(theme_toggle("color-scheme"), className="nav-tools"), visibleFrom="sm"),
-                    html.Div(
-                        className="nav-contact nav-text",
-                        children=[
-                            html.Div(
-                                [
-                                    html.Img(src="/assets/brand/mark.png", alt="", className="nav-contact-mark"),
-                                    html.Span("Le même suivi sur votre ligne ?"),
-                                ],
-                                className="nav-contact-title",
-                            ),
-                            html.P("Vision industrielle, IA embarquée, monitoring procédé et plans d'expériences."),
-                        ],
-                    ),
-                    tip(
-                        "contact-tip",
-                        "Contacter l'auteur",
-                        html.A(
-                            [icon("mail", 16), html.Span("Contacter l'auteur", className="nav-text")],
-                            href=CONTACT_URL,
-                            className="btn-primary nav-cta",
-                            target="_blank",
-                            rel="noopener noreferrer",
-                            **{"aria-label": "Contacter l'auteur"},
-                        ),
+                    theme_toggle("color-scheme"),
+                    dmc.ActionIcon(
+                        id="nav-collapse",
+                        variant="subtle",
+                        color="gray",
+                        size="lg",
+                        radius="md",
+                        className="nav-collapse",
+                        n_clicks=0,
+                        children=[icon("panel-left-close", 18), icon("panel-left-open", 18)],
+                        **{"aria-label": "Replier / déplier le menu"},
                     ),
                 ],
             ),
@@ -179,7 +160,7 @@ def create_app() -> Dash:
             {"name": "robots", "content": "index, follow"},
         ],
     )
-    app._favicon = "brand/mark.png"
+    app._favicon = "brand/favicon.png"
     app.layout = dmc.MantineProvider(
         defaultColorScheme="dark",
         theme={
@@ -216,7 +197,6 @@ clientside_callback(
     *[Output(f"section-{key}", "style") for key, *_ in SECTIONS],
     Output({"type": "nav", "index": ALL}, "active"),
     Output({"type": "nav-tip", "index": ALL}, "disabled"),
-    Output("contact-tip", "disabled"),
     Output("app-shell", "navbar"),
     Output("app-shell", "className"),
     Output("nav-burger", "opened"),

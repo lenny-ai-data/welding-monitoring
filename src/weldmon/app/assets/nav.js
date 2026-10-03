@@ -89,7 +89,6 @@
           ...styles,
           KEYS.map((k) => k === current),
           KEYS.map(() => !collapsed),
-          !collapsed,
           nav,
           collapsed ? "app-shell nav-collapsed" : "app-shell",
           opened,
