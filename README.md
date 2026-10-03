@@ -22,7 +22,7 @@ Navigation par barre latérale repliable (icônes seules), liens directs `#proce
 jusqu'à 15, NOK au-delà ou dès qu'un écart de vitesse soutenu (±20 % pendant 5 ms) est détecté. Limites de
 vigilance des indicateurs : vitesse ±10 % de la consigne, instabilité au 90ᵉ centile des 81 soudures.
 
-## Ce que l'on montre, et ce que l'on ne prétend pas
+## Mesures et segmentation
 
 Le dataset ne contient **aucun log capteur** : puissance et vitesse sont des consignes constantes par run. Le
 dashboard les affiche comme telles, entre l'allumage et l'extinction du laser, eux-mêmes détectés à l'image.
@@ -55,7 +55,7 @@ src/weldmon/app/
   data.py      accès lecture seule aux artefacts, liste blanche des runs
   theme.py     jetons clair / sombre, violet de l'interface, couleurs de classes validées (daltonisme, contraste)
   tabs/        history (suivi), process, segmentation, doe (analyses), about
-  assets/      CSS, logique client (process.js, history.js, seg.js, nav.js), polices Sora / JetBrains Mono et logo auto-hébergés
+  assets/      CSS, logique client (process.js, history.js, seg.js, nav.js), polices Sora / JetBrains Mono et photo de profil auto-hébergées
 ```
 
 Principe : **tout est précalculé**. Le serveur ne sert que la mise en page et des fichiers statiques. Le
@@ -116,4 +116,4 @@ DOMAIN=demo.mondomaine.fr docker compose up -d
 ```
 
 Variables d'environnement : `PORT` (8050), `WEB_CONCURRENCY` (2), `GUNICORN_THREADS` (4),
-`FORWARDED_ALLOW_IPS`, `WELDMON_TRUST_PROXY` (1), `WELDMON_CONTACT_URL`.
+`FORWARDED_ALLOW_IPS`, `WELDMON_TRUST_PROXY` (1).

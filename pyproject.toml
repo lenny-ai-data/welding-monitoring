@@ -1,7 +1,7 @@
 [project]
 name = "weldmon"
 version = "0.1.0"
-description = "Laser Welding Process Monitor — dashboard vitrine (Dash/Plotly) sur le dataset Zenodo 22282527"
+description = "Laser Welding Process Monitor : dashboard de démonstration (Dash/Plotly) sur le dataset Zenodo 22282527, projet personnel non commercial"
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
 dependencies = [
