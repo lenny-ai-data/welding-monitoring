@@ -57,11 +57,11 @@ def test_video_supports_range_requests(client):
     assert "max-age" in r.headers["Cache-Control"]
 
 
-def test_overlay_ok(client):
-    r = client.get("/overlay/DoE3_19/60.jpg?src=pred&cls=wps&a=55")
-    assert r.status_code == 200
-    assert r.headers["Content-Type"] == "image/jpeg"
-    assert r.data[:2] == b"\xff\xd8"
+def test_segmentation_files_served(client):
+    for path in ("frames/060.webp", "gt/060.png", "pred/060.png"):
+        r = client.get(f"/media/seg/DoE3_19/{path}")
+        assert r.status_code == 200
+        assert "max-age" in r.headers["Cache-Control"]
 
 
 # Listes blanches ----------------------------------------------------------------------------------
@@ -76,26 +76,14 @@ def test_overlay_ok(client):
         "/media/videos/../../meta.json",
         "/media/videos/DoE9_1.mp4",
         "/media/videos/DoE3_99.mp4",
-        "/media/seg/DoE3_19/gt/000.png",
+        "/media/seg/DoE3_19/gt/000.webp",
+        "/media/seg/DoE3_19/../../meta.json",
+        "/media/seg/DoE3_19/gt/9999.png",
+        "/media/seg/DoE1_1/gt/000.png",  # run non annoté : fichier absent
     ],
 )
 def test_media_whitelist(client, path):
     assert client.get(path).status_code == 404
-
-
-@pytest.mark.parametrize(
-    "path",
-    [
-        "/overlay/DoE1_1/10.jpg",  # run non annoté
-        "/overlay/DoE3_19/999.jpg",  # frame hors bornes
-        "/overlay/DoE3_19/10.jpg?src=../../etc",
-        "/overlay/DoE3_19/10.jpg?cls=xyz",
-        "/overlay/DoE3_19/10.jpg?a=500",
-        "/overlay/..%2Fmeta/10.jpg",
-    ],
-)
-def test_overlay_rejects_bad_params(client, path):
-    assert client.get(path).status_code in (400, 404)
 
 
 def test_valid_run_whitelist():

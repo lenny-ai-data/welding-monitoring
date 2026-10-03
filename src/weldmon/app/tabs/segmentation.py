@@ -1,7 +1,7 @@
 """Onglet « Segmentation IA » : annotations SAM2 relues vs prédictions du U-Net, frame par frame.
 
-Les images sont composées par la route /overlay (paramètres en liste blanche, cache) ; le
-changement de frame ne déclenche aucun callback serveur (URL calculée côté client).
+Les images sont composées dans le navigateur (assets/seg.js) à partir de fichiers statiques : frame et cartes
+de labels de app_data/media/seg/. Le changement de frame ne sollicite jamais le serveur.
 """
 
 import dash_mantine_components as dmc
@@ -36,6 +36,8 @@ EXPLANATIONS = [
 
 # Teinte moyenne de chaque classe (lisible dans les deux thèmes).
 CHIP_COLORS = {"weld": "#9550d8", "plasma": "#dd6a1e", "spatter": "#d2448c"}
+# Couleurs d'incrustation par indice de classe (identiques aux vidéos IA de pipeline/06_infer.py), 4 = désaccord.
+OVERLAY_COLORS = {1: (149, 80, 216), 2: (221, 106, 30), 3: (210, 68, 140), 4: (208, 59, 59)}
 CLASSES = [("w", "weld", "Cordon"), ("p", "plasma", "Plasma"), ("s", "spatter", "Projections")]
 
 
@@ -207,7 +209,13 @@ def layout() -> html.Div:
                                             html.Figure(
                                                 className="seg-fig",
                                                 children=[
-                                                    html.Img(id="seg-img-a", alt="Frame annotée"),
+                                                    html.Canvas(
+                                                        id="seg-img-a",
+                                                        width=512,
+                                                        height=512,
+                                                        role="img",
+                                                        **{"aria-label": "Frame annotée"},
+                                                    ),
                                                     html.Figcaption(id="seg-cap-a"),
                                                 ],
                                             ),
@@ -215,7 +223,13 @@ def layout() -> html.Div:
                                                 id="seg-fig-b",
                                                 className="seg-fig",
                                                 children=[
-                                                    html.Img(id="seg-img-b", alt="Prédiction du modèle ou désaccords"),
+                                                    html.Canvas(
+                                                        id="seg-img-b",
+                                                        width=512,
+                                                        height=512,
+                                                        role="img",
+                                                        **{"aria-label": "Prédiction du modèle ou désaccords"},
+                                                    ),
                                                     html.Figcaption(id="seg-cap-b"),
                                                 ],
                                             ),
@@ -423,6 +437,7 @@ def area_figs(run_id: str, scheme: str | None) -> dict:
         "t_ms": x,
         "frames": [f["frame"] for f in frames],
         "muted": t["muted"],
+        "overlay": {cid: list(rgb) for cid, rgb in OVERLAY_COLORS.items()},
     }
 
 
@@ -438,8 +453,6 @@ def load_seg(run_id, scheme):
 
 clientside_callback(
     ClientsideFunction("seg", "render"),
-    Output("seg-img-a", "src"),
-    Output("seg-img-b", "src"),
     Output("seg-cap-a", "children"),
     Output("seg-cap-b", "children"),
     Output("seg-fig-b", "style"),

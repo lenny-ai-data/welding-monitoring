@@ -34,7 +34,7 @@ Architecture de l'application Dash (`src/weldmon/app/`), conventions de code et 
 | `__init__.py` | `create_app()` : coque Mantine (barre latérale, en-tête mobile), liste des sections, thème, installation de la sécurité, callback de navigation |
 | `main.py` | point d'entrée : `python -m weldmon.app.main` en local, `weldmon.app.main:server` pour gunicorn ; préchauffe le registre des composants Dash avant le fork des workers |
 | `data.py` | accès en lecture seule à `app_data/` (lectures mises en cache), liste blanche des runs (`valid_run`) |
-| `security.py` | en-têtes HTTP (CSP, HSTS...), routes `/media/<fichier>`, `/overlay/<run>/<k>.jpg`, `/healthz` |
+| `security.py` | en-têtes HTTP (CSP, HSTS...), routes `/media/<fichier>` (liste blanche des noms de fichiers) et `/healthz` |
 | `components.py` | composants partagés : icône Lucide, badge de verdict, en-tête de section avec bandeau d'explications |
 | `theme.py` | couleurs (clair / sombre), échelles, gabarits d'axes et de mise en page Plotly |
 | `tabs/*.py` | un module par onglet : constantes, `layout()`, fonctions de figures, callbacks |
@@ -79,9 +79,11 @@ Dash charge automatiquement tout le contenu de `assets/` (CSS et JS) dans l'ordr
   hors callback Dash.
 - « Lecture auto » (`prod-mode`) enchaîne les soudures dans l'ordre réel de production (`data.next_run`).
 
-**Segmentation IA.** Les images comparées (annotation, prédiction ou désaccords) sont composées à la demande par
-la route `/overlay` de `security.py` à partir de `app_data/media/seg/`, puis mises en cache. Le changement de
-frame ne déclenche aucun callback serveur : `seg.render` calcule simplement l'URL de l'image.
+**Segmentation IA.** Les images comparées (annotation, prédiction ou désaccords) sont composées **dans le
+navigateur** par `assets/seg.js`, à partir de fichiers statiques : la frame (`frames/NNN.webp`) et les deux cartes
+de labels (`gt/NNN.png`, `pred/NNN.png`) de `app_data/media/seg/<run>/`. Le serveur ne calcule rien, et les
+fichiers se mettent en cache. Pendant la lecture, la frame suivante n'est demandée qu'une fois la frame courante
+dessinée, et les 6 suivantes sont chargées d'avance : sur un réseau lent, la lecture ralentit au lieu de geler.
 
 ## 5. Logique côté client
 
@@ -93,7 +95,7 @@ Chaque fichier JS enregistre un espace de noms dans `window.dash_clientside`, ap
 | `nav.js` | `nav` | section visible, lien actif, barre repliée (préférence mémorisée dans le navigateur), menu mobile |
 | `process.js` | `weld` | lecteur vidéo, synchronisation vidéo et signaux, cartes, journal d'événements |
 | `history.js` | `history` | sélection d'une soudure, filtre par verdict, ouverture dans le monitoring |
-| `seg.js` | `seg` | URL des images composées, curseur temporel, lecture automatique des frames |
+| `seg.js` | `seg` | composition des images (frame + masques), curseur temporel, lecture et préchargement des frames |
 
 Une fonction clientside renvoie ses sorties **dans l'ordre exact des `Output` déclarés en Python**, et
 `window.dash_clientside.no_update` pour une sortie inchangée.
@@ -112,7 +114,7 @@ erreur explicite.
 | noms de fichiers de `app_data/media/` | URL construites dans `process.js` et `seg.js` | à garder conformes à `MEDIA_RE` (`security.py`) |
 
 Les couleurs de classes (cordon, plasma, projections) sont aussi définies à trois endroits qui doivent rester
-cohérents : `theme.TOKENS`, `security.OVERLAY_COLORS` (images composées) et `pipeline/06_infer.OVERLAY` (vidéos
+cohérents : `theme.TOKENS`, `segmentation.OVERLAY_COLORS` (images composées dans le navigateur) et `pipeline/06_infer.OVERLAY` (vidéos
 IA, en BGR).
 
 ## 7. Thème et mise en page

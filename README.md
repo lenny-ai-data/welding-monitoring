@@ -132,7 +132,7 @@ Les dépendances Python sont réparties en groupes :
 
 | Groupe | Contenu | Installé par |
 |---|---|---|
-| (principal) | Dash, Mantine, gunicorn, Pillow : le runtime de l'app | toujours, seul dans l'image Docker |
+| (principal) | Dash, Mantine, gunicorn : le runtime de l'app | toujours, seul dans l'image Docker |
 | `analysis` | numpy, pandas, scipy, OpenCV, pyarrow | CI, étapes du pipeline sans GPU |
 | `ml` | torch, torchvision, segmentation-models-pytorch, timm | entraînement et inférence |
 | `pipeline` | `analysis` + `ml` | `make` (cibles du pipeline) |
@@ -153,7 +153,7 @@ Les dépendances Python sont réparties en groupes :
 │   ├── __init__.py           create_app() : coque, navigation, thème
 │   ├── main.py               point d'entrée (local et gunicorn)
 │   ├── data.py               lecture seule des artefacts, liste blanche des runs
-│   ├── security.py           en-têtes HTTP, routes /media, /overlay, /healthz
+│   ├── security.py           en-têtes HTTP, routes /media et /healthz
 │   ├── components.py         composants partagés (en-têtes de section, badges, icônes)
 │   ├── theme.py              jetons de couleur clair / sombre, mise en page Plotly commune
 │   ├── tabs/                 un module par onglet

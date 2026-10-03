@@ -1368,7 +1368,8 @@ body {
 .seg-fig {
   margin: 0;
 }
-.seg-fig img {
+.seg-fig img,
+.seg-fig canvas {
   width: 100%;
   aspect-ratio: 1 / 1;
   display: block;
