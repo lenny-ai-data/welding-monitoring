@@ -21,6 +21,7 @@ Ce document est le point d'entrée pour reprendre le projet. Les détails sont d
 | [docs/donnees.md](docs/donnees.md) | Dictionnaire des données : chaque fichier produit, ses colonnes, ses unités, d'où il vient |
 | [docs/modele.md](docs/modele.md) | Fiche du modèle de segmentation : données, entraînement, évaluation, rechargement, réentraînement |
 | [docs/application.md](docs/application.md) | Architecture de l'application Dash, flux de données, contrats entre Python et JavaScript |
+| [docs/production.md](docs/production.md) | Temps d'inférence mesurés, architecture de production proposée, dimensionnement, points à valider |
 | [docs/exploitation.md](docs/exploitation.md) | Image Docker, déploiement, sécurité, configuration, maintenance |
 
 ## Sommaire
@@ -32,11 +33,12 @@ Ce document est le point d'entrée pour reprendre le projet. Les détails sont d
 5. [Données](#5-données)
 6. [Pipeline de traitement](#6-pipeline-de-traitement)
 7. [Modèle de segmentation](#7-modèle-de-segmentation)
-8. [Signaux, alarmes et verdict qualité](#8-signaux-alarmes-et-verdict-qualité)
-9. [Application](#9-application)
-10. [Qualité : tests, lint, CI](#10-qualité--tests-lint-ci)
-11. [Limites connues et pistes](#11-limites-connues-et-pistes)
-12. [Licence et attribution](#12-licence-et-attribution)
+8. [Performances et passage en production](#8-performances-et-passage-en-production)
+9. [Signaux, alarmes et verdict qualité](#9-signaux-alarmes-et-verdict-qualité)
+10. [Application](#10-application)
+11. [Qualité : tests, lint, CI](#11-qualité--tests-lint-ci)
+12. [Limites connues et pistes](#12-limites-connues-et-pistes)
+13. [Licence et attribution](#13-licence-et-attribution)
 
 ## 1. Périmètre
 
@@ -67,13 +69,13 @@ immédiate, le coût d'hébergement quasi nul et la surface d'attaque minimale. 
 
 ### Et sur une vraie ligne de production ?
 
-Le découpage du code correspond déjà à celui d'un déploiement réel : une brique d'inférence près de la caméra
-(`segmodel.py`, mesures de `06_infer.py`, signaux de `07_signals.py`) qui produit des signaux, et une brique de
-restitution qui les affiche. En production, la première tournerait en continu sur un poste équipé d'un GPU et le
-dashboard lirait ses sorties au fil de l'eau au lieu de les rejouer. Le principal travail restant serait de
-rendre les traitements **causaux** : plusieurs d'entre eux exploitent aujourd'hui la vidéo entière (rejet des
-détections immobiles, seuil de pic de plasma calculé sur le régime établi, filtres centrés sur la vitesse et
-l'instabilité), ce qu'un système en ligne ne peut pas faire.
+Le découpage du code correspond déjà à celui d'un déploiement réel : une brique d'inférence au pied de la machine
+(`segmodel.py`, mesures de `06_infer.py`, signaux de `07_signals.py`, règles de verdict de `09_export.py`) et une
+brique de restitution, le dashboard. Avec les performances mesurées (environ 3 s de calcul par soudure sur un GPU,
+voir [section 8](#8-performances-et-passage-en-production)), le scénario réaliste est un **contrôle à chaque
+soudure** : la caméra enregistre, transfère la séquence, la chaîne rend un verdict quelques secondes plus tard.
+Ce mode réutilise le code presque tel quel. Réagir **pendant** la soudure demanderait en plus de rendre plusieurs
+traitements causaux et de multiplier le débit de calcul. Le détail est dans [docs/production.md](docs/production.md).
 
 ### Ce que le projet ne couvre pas
 
@@ -154,7 +156,8 @@ Les dépendances Python sont réparties en groupes, pour ne jamais installer tor
 │   ├── 01_extract.py ... 09_export.py
 │   ├── segmodel.py           architecture du U-Net, prétraitement, post-traitement
 │   ├── metrics.py            IoU par classe, appariement des projections
-│   └── baseline_cv.py        baseline sans apprentissage (seuillage), pour comparaison
+│   ├── baseline_cv.py        baseline sans apprentissage (seuillage), pour comparaison
+│   └── bench_infer.py        mesure des temps d'inférence (make bench)
 ├── src/weldmon/app/          application Dash (seul code embarqué dans l'image)
 │   ├── __init__.py           create_app() : coque, navigation, thème
 │   ├── main.py               point d'entrée (local et gunicorn)
@@ -258,7 +261,27 @@ Les poids (`models/unet.pt`, 98 Mo) ne sont ni versionnés ni embarqués dans l'
 hors de la machine de développement.** Rechargement, réentraînement et ajout d'annotations :
 [docs/modele.md](docs/modele.md).
 
-## 8. Signaux, alarmes et verdict qualité
+## 8. Performances et passage en production
+
+Temps mesurés sur RTX 3090, pour une soudure type de 700 images (reproductibles avec `make bench`) :
+
+| Poste | Temps par soudure | Débit |
+|---|---|---|
+| U-Net seul | 2,3 s | 300 im/s (407 im/s en passe avant pure, lots de 32, fp16) |
+| Chaîne de mesure complète (modèle, post-traitement, mesures) | environ 3 s | |
+| Même chaîne sur CPU seul | environ 2 min | 6 im/s : un GPU est nécessaire |
+| Mémoire GPU | 3,3 Go | |
+
+**Ce que cela permet** : un verdict quelques secondes après chaque soudure, avec un seul GPU de gamme courante
+pour une vingtaine de soudures par minute. **Ce que cela ne permet pas** : suivre chaque image au rythme de la
+caméra (6 000 à 9 000 im/s), 20 à 30 fois plus rapide que le modèle.
+
+[docs/production.md](docs/production.md) détaille les mesures, propose une architecture de production (déclenchement,
+acquisition, inférence au pied de la machine, décision vers l'automate, stockage, supervision, suivi du modèle),
+la dimensionne et liste les optimisations et les points à valider avant un pilote, à commencer par le lien entre
+le verdict et la qualité réelle des soudures.
+
+## 9. Signaux, alarmes et verdict qualité
 
 Construits par `07_signals.py` à partir des mesures par frame, puis qualifiés par `09_export.py`.
 
@@ -287,7 +310,7 @@ Construits par `07_signals.py` à partir des mesures par frame, puis qualifiés 
 Le seuil de rafale et la limite d'instabilité sont calculés sur les données. Après un réentraînement, ils
 peuvent légèrement bouger, et avec eux le verdict des soudures proches d'une limite.
 
-## 9. Application
+## 10. Application
 
 Principe : **tout est précalculé**. L'inférence du modèle a lieu dans le pipeline (étape `06_infer`), pas dans
 l'app (voir [Périmètre](#volet-2--dashboard-de-restitution-en-ligne)). Le serveur ne sert que la mise en page et
@@ -307,7 +330,7 @@ Contrainte de mise en page : chaque page tient sans défilement en plein écran 
 
 Architecture détaillée, conventions et procédure d'ajout d'un onglet : [docs/application.md](docs/application.md).
 
-## 10. Qualité : tests, lint, CI
+## 11. Qualité : tests, lint, CI
 
 ```bash
 make test                 # pytest
@@ -321,18 +344,19 @@ make scan                 # Trivy sur l'image + pip-audit des dépendances runti
   rendu des onglets. **Sautés automatiquement si `app_data/` est absent** (cas de la CI).
 - CI GitHub (`.github/workflows/ci.yml`) : lint, tests, audit des dépendances runtime, sans GPU ni données.
 
-## 11. Limites connues et pistes
+## 12. Limites connues et pistes
 
 | Limite | Conséquence | Piste |
 |---|---|---|
 | Modèle entraîné sur DoE3 seulement | mesures moins fiables sur DoE1 / DoE2 | annoter quelques frames DoE1 / DoE2 et affiner le modèle |
 | Pas de reprise d'entraînement | `05_train_seg` repart toujours des poids ImageNet | option de fine-tuning depuis `unet.pt` |
-| `DEVICE = "cuda"` en dur (05, 06) | pas d'inférence sur CPU | option `--device` |
+| `DEVICE = "cuda"` en dur (05, 06) | pas d'inférence sur CPU, de toute façon trop lente (6 im/s) | option `--device` pour les tests |
 | Poids et artefacts hors dépôt | perte possible avec la machine | stockage externe (bucket, release privée) |
 | Pas de version du modèle dans les artefacts | traçabilité limitée | manifeste (hash des poids, date, données) écrit par 05 et repris par 09 |
+| Inférence non optimisée | 25 % du temps passé autour du modèle (prétraitement sur CPU) | prétraitement et argmax sur GPU, TensorRT ([docs/production.md](docs/production.md)) |
 | Reproductibilité non bit à bit | métriques très proches mais pas identiques après réentraînement | acceptable ; figer les poids livrés |
 
-## 12. Licence et attribution
+## 13. Licence et attribution
 
 - **Données** : dataset de A. Darwish, M. Persson, A. Andersson Lassila, D. Lönn, S. Ericson, K. Salomonsson
   (University of Skövde), [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/) : usage non commercial,

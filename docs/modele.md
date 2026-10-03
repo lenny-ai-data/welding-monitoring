@@ -11,8 +11,9 @@ du projet en dépendent.
 4. [Post-traitement](#4-post-traitement)
 5. [Évaluation](#5-évaluation)
 6. [Utiliser le modèle](#6-utiliser-le-modèle)
-7. [Réentraîner ou enrichir](#7-réentraîner-ou-enrichir)
-8. [Limites](#8-limites)
+7. [Performances](#7-performances)
+8. [Réentraîner ou enrichir](#8-réentraîner-ou-enrichir)
+9. [Limites](#9-limites)
 
 ## 1. Résumé
 
@@ -141,7 +142,21 @@ labels = suppress_static(labels)  # (N, 512, 512), valeurs 0 à 3
 Pour passer des cartes de labels aux mesures physiques, réutiliser `frame_features` de `06_infer.py` (mesures en
 pixels), puis la chaîne de `07_signals.py` (étalonnage en mm, signaux, alarmes).
 
-## 7. Réentraîner ou enrichir
+## 7. Performances
+
+Mesuré sur RTX 3090 avec `make bench` (détail et projection vers la production : [production.md](production.md)).
+
+| Configuration | Débit | Soudure type (700 images) |
+|---|---|---|
+| GPU, lots de 32, fp16, passe avant seule | 407 im/s | 1,7 s |
+| GPU, lots de 32, fp16, chaîne de `06_infer` (prétraitement, argmax, retour CPU) | 300 im/s | 2,3 s |
+| GPU, une image à la fois, fp16 (latence 3,7 ms) | 269 im/s | 2,6 s |
+| GPU, lots de 32, fp32 | 259 im/s | 2,7 s |
+| CPU, 12 threads, fp32 | 6 im/s | environ 2 min |
+
+Mémoire GPU de pointe : 3,3 Go. Le post-traitement (`suppress_static`) est négligeable : 0,2 s par vidéo.
+
+## 8. Réentraîner ou enrichir
 
 **Réentraîner à l'identique** : `make train infer features export`, puis `make docker`. Sauvegarder
 `models/unet.pt` avant : il est écrasé. Les métriques ressortiront très proches mais pas identiques (le calcul
@@ -163,7 +178,7 @@ la correspondance frame annotée / frame vidéo (`04_labels.frame_mapping`).
 **Changer d'architecture ou d'encodeur** : modifier `segmodel.build_model` (et `ENCODER`). Le reste du pipeline
 ne dépend que de la sortie `(N, 4, H, W)`.
 
-## 8. Limites
+## 9. Limites
 
 - **Domaine** : entraîné sur DoE3 seulement. Sur DoE1 et DoE2, les mesures restent exploitables grâce aux
   augmentations et au post-traitement, mais moins fiables ; l'app les marque « hors domaine ».
