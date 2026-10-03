@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1.7
-# Weld Process Monitor : image de production (app Dash + artefacts précalculés).
+# Laser Welding Process Monitor : image de production (app Dash + artefacts précalculés).
 # Le pipeline (torch, données brutes, modèle) n'est jamais embarqué : seuls src/ et app_data/ le sont.
 
 ARG PYTHON_IMAGE=python:3.12-alpine@sha256:0687a6bc9716edc2a6ee0fbfb0f87e7ee358b262b67c9215de91bc9b2d38ba71
@@ -32,7 +32,7 @@ RUN cd /opt/venv/lib/python3.12/site-packages \
 
 # --- Runtime : Alpine, non-root, aucun outil de build, fichiers applicatifs en lecture seule ----
 FROM ${PYTHON_IMAGE} AS runtime
-LABEL org.opencontainers.image.title="Weld Process Monitor" \
+LABEL org.opencontainers.image.title="Laser Welding Process Monitor" \
       org.opencontainers.image.description="Monitoring de soudage laser rejoué : vidéo haute vitesse, segmentation IA, DoE" \
       org.opencontainers.image.authors="Lenny Jacquinot" \
       org.opencontainers.image.source="https://github.com/lenny-ai-data/welding-monitoring" \

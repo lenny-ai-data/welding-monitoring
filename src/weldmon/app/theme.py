@@ -7,6 +7,7 @@ catégorielles, validées pour la séparation daltonisme / contraste sur chaque 
 dataviz) : la couleur suit l'entité dans tous les graphiques et vidéos.
 """
 
+# Couleurs -----------------------------------------------------------------------------------------
 BRAND = "#8c18cc"
 
 # Nuances du violet de marque (Mantine attend 10 tons, du plus clair au plus foncé).
@@ -113,6 +114,7 @@ def pale_plasma(scheme: str | None) -> list:
     return [[i / n, _mix(c, page, k)] for i, c in enumerate(stops)]
 
 
+# Accès aux jetons et gabarits Plotly --------------------------------------------------------------
 FONT = "Sora, system-ui, -apple-system, 'Segoe UI', sans-serif"
 
 

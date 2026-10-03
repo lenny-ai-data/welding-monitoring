@@ -11,6 +11,7 @@ from dash import Input, Output, callback, dcc, html
 from .. import data, theme
 from ..components import point, section_header
 
+# Constantes et textes -----------------------------------------------------------------------------
 EXPLANATIONS = [
     point(
         "L'étude de sensibilité",
@@ -40,6 +41,9 @@ GRID = 41
 FACTORS = ("P", "v", "f", "y")
 
 
+# Calcul des modèles (Python pur, à partir des coefficients de doe.json) ---------------------------
+
+
 def factor_value(run: dict, key: str) -> float:
     f = data.doe()["factors"][key]
     return (run[f["column"]] - f["center"]) / f["half_range"]
@@ -57,6 +61,9 @@ def predict(kpi: dict, coded: dict[str, float]) -> float:
 
 def fmt(v: float, d: int = 2) -> str:
     return f"{v:.{d}f}".replace(".", ",")
+
+
+# Mise en page -------------------------------------------------------------------------------------
 
 
 def graph(graph_id: str, height: str) -> dcc.Graph:
@@ -181,6 +188,9 @@ def layout() -> html.Div:
             ),
         ],
     )
+
+
+# Figures : surface de réponse, effets standardisés, effets principaux, carte I-MR -----------------
 
 
 def surface_fig(kpi_key: str, fx: str, fy: str, scheme) -> dict:
@@ -449,6 +459,9 @@ def spc_fig(kpi_key: str, scheme) -> dict:
         t, title={"text": f"résidu ({kpi['unit']})" if kpi["unit"] else "résidu"}, nticks=5, fixedrange=True
     )
     return {"data": traces, "layout": layout}
+
+
+# Callback -----------------------------------------------------------------------------------------
 
 
 @callback(

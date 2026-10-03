@@ -7,6 +7,7 @@ from . import security, theme
 from .components import icon
 from .tabs import about, doe, history, process, segmentation
 
+# Identité et sections -----------------------------------------------------------------------------
 TITLE = "Monitoring Soudage | Lenny Jacquinot"
 AUTHOR = "Lenny Jacquinot"
 AUTHOR_TAGLINE = "IA & Data pour l'industrie"
@@ -27,6 +28,9 @@ SECTIONS = [
 ]
 DEFAULT_SECTION = "process"
 NAV_WIDTH = {"expanded": 240, "collapsed": 72}
+
+
+# Coque : profil, en-tête mobile, barre latérale, sections -----------------------------------------
 
 
 def profile() -> html.A:
@@ -146,6 +150,9 @@ def sections() -> html.Div:
     )
 
 
+# Application --------------------------------------------------------------------------------------
+
+
 def create_app() -> Dash:
     app = Dash(
         __name__,
@@ -190,7 +197,8 @@ def create_app() -> Dash:
     return app
 
 
-# Navigation (côté client) : section affichée, lien actif, barre repliée / dépliée, menu mobile,
+# Navigation côté client (assets/nav.js) -----------------------------------------------------------
+# Section affichée, lien actif, barre repliée / dépliée, menu mobile,
 # bascule depuis le suivi vers le monitoring, vidéo mise en pause quand on quitte le monitoring.
 clientside_callback(
     ClientsideFunction("nav", "route"),
