@@ -345,8 +345,8 @@ def main_effects(kpi_key: str, scheme) -> dict[str, dict]:
         layout = theme.base_layout(
             scheme, showlegend=False, hovermode="closest", margin={"l": 40, "r": 10, "t": 4, "b": 22}
         )
-        layout["xaxis"] = theme.xaxis(t, type="category", fixedrange=True)
-        layout["yaxis"] = theme.axis(t, range=[lo - pad, hi + pad], nticks=3, fixedrange=True)
+        layout["xaxis"] = theme.xaxis(t, type="category")
+        layout["yaxis"] = theme.axis(t, range=[lo - pad, hi + pad], nticks=3)
         figs[key] = {"data": [trace], "layout": layout}
     return figs
 
@@ -454,10 +454,8 @@ def spc_fig(kpi_key: str, scheme) -> dict:
         shapes=shapes,
         annotations=annotations,
     )
-    layout["xaxis"] = theme.xaxis(t, nticks=9, fixedrange=True)
-    layout["yaxis"] = theme.axis(
-        t, title={"text": f"résidu ({kpi['unit']})" if kpi["unit"] else "résidu"}, nticks=5, fixedrange=True
-    )
+    layout["xaxis"] = theme.xaxis(t, nticks=9)
+    layout["yaxis"] = theme.axis(t, title={"text": f"résidu ({kpi['unit']})" if kpi["unit"] else "résidu"}, nticks=5)
     return {"data": traces, "layout": layout}
 
 

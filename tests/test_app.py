@@ -152,3 +152,28 @@ def test_doe_factor_constants_match_data():
     from weldmon.app.tabs import doe
 
     assert list(doe.FACTORS) == list(data.doe()["factors"])
+
+
+def all_layouts():
+    """Mises en page de tous les graphes de l'app, pour un run et un indicateur représentatifs."""
+    from weldmon.app.tabs import doe, history, process, segmentation
+
+    kpi = next(iter(data.doe()["kpis"]))
+    yield from process.live_payload("DoE3_19", "dark")["layouts"].values()
+    yield history.trend_figure("DoE3_19", "all", "dark")["layout"]
+    yield doe.surface_fig(kpi, "P", "v", "dark")["layout"]
+    yield doe.pareto_fig(kpi, "dark")["layout"]
+    yield from (f["layout"] for f in doe.main_effects(kpi, "dark").values())
+    yield doe.spc_fig(kpi, "dark")["layout"]
+    figs = segmentation.area_figs("DoE3_19", "dark")
+    yield figs["areas"]["layout"]
+    yield figs["iou"]["layout"]
+
+
+def test_figures_cannot_be_zoomed():
+    layouts = list(all_layouts())
+    assert len(layouts) >= 12
+    for layout in layouts:
+        assert layout.get("dragmode") is False
+        axes = [k for k in layout if k.startswith(("xaxis", "yaxis"))]
+        assert axes and all(layout[k].get("fixedrange") is True for k in axes), axes

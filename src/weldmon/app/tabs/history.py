@@ -385,10 +385,8 @@ def trend_figure(selected: str, flt: str, scheme) -> dict:
         shapes=shapes,
         annotations=annotations,
     )
-    layout["xaxis"] = theme.axis(
-        t, range=[0, len(runs) + 1], showgrid=False, showticklabels=False, ticks="", fixedrange=True
-    )
-    layout["yaxis"] = theme.axis(t, range=[0, ymax], nticks=4, ticks="", showline=False, fixedrange=True)
+    layout["xaxis"] = theme.axis(t, range=[0, len(runs) + 1], showgrid=False, showticklabels=False, ticks="")
+    layout["yaxis"] = theme.axis(t, range=[0, ymax], nticks=4, ticks="", showline=False)
     return {"data": traces, "layout": layout}
 
 
