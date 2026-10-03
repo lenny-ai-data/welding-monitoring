@@ -71,19 +71,17 @@ immédiate, le coût d'hébergement quasi nul et la surface d'attaque minimale. 
 
 Le découpage du code correspond déjà à celui d'un déploiement réel : une brique d'inférence au pied de la machine
 (`segmodel.py`, mesures de `06_infer.py`, signaux de `07_signals.py`, règles de verdict de `09_export.py`) et une
-brique de restitution, le dashboard. Avec les performances mesurées (environ 3 s de calcul par soudure sur un GPU,
-voir [section 8](#8-performances-et-passage-en-production)), le scénario réaliste est un **contrôle à chaque
-soudure** : la caméra enregistre, transfère la séquence, la chaîne rend un verdict quelques secondes plus tard.
-Ce mode réutilise le code presque tel quel. Réagir **pendant** la soudure demanderait en plus de rendre plusieurs
-traitements causaux et de multiplier le débit de calcul. Le détail est dans [docs/production.md](docs/production.md).
+brique de restitution, le dashboard. Les performances mesurées permettent d'envisager un **contrôle à chaque
+soudure**, en environ 3 s de calcul par contrôle sur un GPU (voir
+[section 8](#8-performances-et-passage-en-production) et [docs/production.md](docs/production.md)).
 
 ### Ce que le projet ne couvre pas
 
 - Le dataset ne contient **aucun log capteur**. Puissance et vitesse affichées sont les **consignes** du plan
   d'expériences, appliquées entre l'allumage et l'extinction détectés à l'image. Toutes les autres courbes sont
   mesurées par vision.
-- Le modèle n'a été entraîné que sur la série DoE3. Les séries DoE1 et DoE2 sont hors domaine (éclairage et
-  cadrage différents) ; l'app le signale par un badge.
+- Le modèle n'a été entraîné que sur la série DoE3. Sur DoE1 et DoE2, dont l'éclairage et le cadrage diffèrent,
+  ses mesures sont moins fiables.
 
 **Résultats principaux**
 
@@ -272,9 +270,8 @@ Temps mesurés sur RTX 3090, pour une soudure type de 700 images (reproductibles
 | Même chaîne sur CPU seul | environ 2 min | 6 im/s : un GPU est nécessaire |
 | Mémoire GPU | 3,3 Go | |
 
-**Ce que cela permet** : un verdict quelques secondes après chaque soudure, avec un seul GPU de gamme courante
-pour une vingtaine de soudures par minute. **Ce que cela ne permet pas** : suivre chaque image au rythme de la
-caméra (6 000 à 9 000 im/s), 20 à 30 fois plus rapide que le modèle.
+Ces temps permettent d'envisager un contrôle à chaque soudure, en environ 3 s par contrôle, avec un GPU de
+gamme courante.
 
 [docs/production.md](docs/production.md) détaille les mesures, propose une architecture de production (déclenchement,
 acquisition, inférence au pied de la machine, décision vers l'automate, stockage, supervision, suivi du modèle),

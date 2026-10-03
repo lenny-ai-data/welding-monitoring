@@ -8,12 +8,11 @@ d'architecture, pas un système testé.
 
 1. [Mesures](#1-mesures)
 2. [Lecture des mesures](#2-lecture-des-mesures)
-3. [Deux façons de déployer](#3-deux-façons-de-déployer)
-4. [Architecture cible : contrôle à chaque soudure](#4-architecture-cible--contrôle-à-chaque-soudure)
+3. [Principe : un contrôle par soudure](#3-principe--un-contrôle-par-soudure)
+4. [Architecture envisagée](#4-architecture-envisagée)
 5. [Dimensionnement](#5-dimensionnement)
 6. [Optimisations possibles](#6-optimisations-possibles)
-7. [Surveillance continue : ce qu'il faudrait en plus](#7-surveillance-continue--ce-quil-faudrait-en-plus)
-8. [Points à valider avant un pilote](#8-points-à-valider-avant-un-pilote)
+7. [Points à valider avant un pilote](#7-points-à-valider-avant-un-pilote)
 
 ## 1. Mesures
 
@@ -47,10 +46,8 @@ Mémoire GPU de pointe : **3,3 Go**.
 ## 2. Lecture des mesures
 
 - **Une soudure type** (110 ms filmées, environ 700 images) passe dans le modèle en **2,3 s**, et dans toute la
-  chaîne de mesure (modèle, post-traitement, mesures) en **environ 3 s**.
-- **Face à la caméra**, qui filme à 6 000 ou 9 000 images par seconde, le modèle est **20 à 30 fois trop lent**
-  pour suivre chaque image au rythme de l'acquisition. Il est en revanche largement assez rapide pour rendre un
-  verdict quelques secondes après chaque soudure.
+  chaîne de mesure (modèle, post-traitement, mesures) en **environ 3 s**. C'est ce qui permet d'envisager un
+  contrôle à chaque soudure.
 - **Le CPU seul n'est pas une option** : environ 2 minutes par soudure. Un GPU est nécessaire, mais modeste en
   mémoire (3,3 Go).
 - **Un quart du temps du modèle est perdu autour de lui** : 407 im/s pour la passe avant seule, 300 im/s une fois
@@ -60,24 +57,16 @@ Mémoire GPU de pointe : **3,3 Go**.
 - **L'encodage de la vidéo avec masques** ne sert qu'à la démonstration ; en production, on ne l'appliquerait
   qu'aux soudures à archiver.
 
-## 3. Deux façons de déployer
+## 3. Principe : un contrôle par soudure
 
-Les caméras ultra-rapides enregistrent dans leur mémoire interne puis transfèrent la séquence : elles ne
-diffusent pas un flux continu à 9 000 images par seconde. Cela oriente naturellement vers le premier mode.
+La caméra enregistre la soudure dans sa mémoire interne, puis transfère la séquence au poste de calcul, qui la
+traite en entier et rend un verdict, en environ 3 s de calcul par soudure. C'est le même traitement que dans ce
+projet, appliqué à une soudure à la fois : le code de mesure et de qualification se réutilise presque tel quel.
 
-| | A. Contrôle à chaque soudure | B. Surveillance continue |
-|---|---|---|
-| Principe | la caméra enregistre la soudure, la transfère, la chaîne la traite en entier | chaque image est traitée dès son arrivée, pendant la soudure |
-| Résultat | verdict quelques secondes après la fin de la soudure | alarme pendant la soudure, action possible sur le procédé |
-| Code actuel | **réutilisable presque tel quel** : les traitements sur la vidéo entière restent valides | à reprendre : plusieurs traitements doivent devenir causaux (section 7) |
-| Puissance de calcul | compatible avec les mesures actuelles | 1 000 im/s et plus, hors de portée sans optimisation ni sous-échantillonnage |
-| Usage typique | tri des pièces, traçabilité, suivi de dérive | régulation, arrêt immédiat |
+L'objectif visé est de savoir si la pièce est bonne avant qu'elle ne quitte le poste, et de garder une trace de
+chaque soudure.
 
-**Recommandation** : viser d'abord le mode A. Il répond au besoin le plus courant (savoir si la pièce est bonne
-avant qu'elle ne quitte le poste), il est compatible avec les performances mesurées et il réutilise l'essentiel du
-code.
-
-## 4. Architecture cible : contrôle à chaque soudure
+## 4. Architecture envisagée
 
 | # | Brique | Rôle | Reprise de l'existant |
 |---|---|---|---|
@@ -101,7 +90,7 @@ code.
 
 ## 5. Dimensionnement
 
-Ordres de grandeur pour le mode A, à partir des mesures de la section 1 (soudure de 700 images). Hypothèse de
+Ordres de grandeur pour un contrôle par soudure, à partir des mesures de la section 1 (soudure de 700 images). Hypothèse de
 liaison caméra : **10 GbE**, standard sur ce niveau d'équipement.
 
 | Grandeur | Valeur | Remarque |
@@ -130,23 +119,7 @@ Aucune n'a été testée. Les gains sont des estimations à confirmer par `make 
 | Résolution d'entrée réduite (256 px) | environ 4 fois moins de calcul | réentraînement nécessaire, petites projections menacées |
 | Encodeur plus léger | variable | réentraînement et réévaluation complets |
 
-## 7. Surveillance continue : ce qu'il faudrait en plus
-
-Pour réagir pendant la soudure (mode B), il faut d'abord des traitements **causaux**, qui n'utilisent que les
-images déjà reçues. Aujourd'hui, plusieurs exploitent la vidéo entière :
-
-| Traitement | Fichier | Ce qu'il utilise | Version causale possible |
-|---|---|---|---|
-| Rejet des détections immobiles | `segmodel.suppress_static` | toute la vidéo | carte des pixels statiques apprise sur les soudures précédentes ou sur une fenêtre passée |
-| Seuil de pic de plasma | `07_signals.run_signals` | régime établi du run complet | seuil appris sur les soudures précédentes de même recette |
-| Vitesse d'avance | `07_signals.run_signals` | filtre de Savitzky-Golay centré | régression sur une fenêtre passée (retard d'environ 10 ms) |
-| Instabilité du plasma | `07_signals.run_signals` | fenêtre glissante centrée | fenêtre passée |
-| Allumage et extinction | `07_signals.detect_on_off` | fenêtre centrée, position finale du front | signal du contrôleur laser |
-
-S'y ajoutent une caméra ou une interface capable de diffuser les images en continu, et un débit de calcul d'au
-moins 1 000 images par seconde (sous-échantillonnage combiné aux optimisations de la section 6).
-
-## 8. Points à valider avant un pilote
+## 7. Points à valider avant un pilote
 
 - **Lien entre verdict et qualité réelle** : le verdict actuel compte des anomalies de procédé (pics de plasma,
   rafales de projections, écarts de vitesse). Il n'a pas été confronté à des contrôles de la soudure elle-même

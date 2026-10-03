@@ -181,7 +181,7 @@ ne dépend que de la sortie `(N, 4, H, W)`.
 ## 9. Limites
 
 - **Domaine** : entraîné sur DoE3 seulement. Sur DoE1 et DoE2, les mesures restent exploitables grâce aux
-  augmentations et au post-traitement, mais moins fiables ; l'app les marque « hors domaine ».
+  augmentations et au post-traitement, mais moins fiables.
 - **Volume** : environ 1 000 frames annotées, issues de 6 soudures. Les scores sur 2 vidéos d'évaluation donnent
   un ordre de grandeur, pas un intervalle de confiance serré.
 - **Pas de reprise d'entraînement** : `05_train_seg` repart toujours des poids ImageNet. Un affinage à partir de
