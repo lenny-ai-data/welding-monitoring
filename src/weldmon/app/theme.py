@@ -48,7 +48,7 @@ TOKENS = {
         "spatter": "#c23f86",
     },
     "dark": {
-        "surface": "#1a1526",
+        "surface": "#121019",
         "page": "#100d18",
         "text": "#ece8f7",
         "text2": "#b3abc9",
