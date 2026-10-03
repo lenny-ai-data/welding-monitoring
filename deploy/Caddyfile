@@ -9,7 +9,7 @@
 	}
 
 	# Les vidéos et images sont immuables entre deux déploiements.
-	@media path /media/* /overlay/*
+	@media path /media/*
 	header @media Cache-Control "public, max-age=604800"
 
 	request_body {
