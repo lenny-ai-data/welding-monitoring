@@ -101,20 +101,22 @@ code.
 
 ## 5. Dimensionnement
 
-Ordres de grandeur pour le mode A, à partir des mesures de la section 1 (soudure de 700 images).
+Ordres de grandeur pour le mode A, à partir des mesures de la section 1 (soudure de 700 images). Hypothèse de
+liaison caméra : **10 GbE**, standard sur ce niveau d'équipement.
 
 | Grandeur | Valeur | Remarque |
 |---|---|---|
 | Volume brut d'une soudure | environ 700 Mo | 700 images de 1 Mo (1024 × 1024, 8 bits) |
-| Transfert caméra vers poste de calcul | environ 6 s sur 1 GbE, moins de 1 s sur 10 GbE | débit utile supposé de 110 Mo/s et 1 Go/s ; à vérifier sur la caméra retenue |
+| Transfert caméra vers poste de calcul | environ 0,7 s | 10 GbE, débit utile supposé d'environ 1 Go/s ; à vérifier sur la caméra retenue |
 | Calcul par soudure | environ 3 s aujourd'hui, environ 2 s optimisé | modèle, post-traitement, mesures, signaux |
-| Délai du verdict après la soudure | transfert + calcul, soit environ 4 à 9 s | selon le lien caméra |
+| Délai du verdict après la soudure | environ 4 s aujourd'hui, environ 3 s optimisé | transfert puis calcul, sans recouvrement |
 | Capacité d'un GPU | environ 20 soudures par minute | au-delà, paralléliser ou optimiser (section 6) |
 | Mémoire GPU | 3,3 Go mesurés | une carte de 8 Go suffit a priori ; débit à mesurer sur le matériel cible |
 | Stockage courant | environ 1 Mo par soudure (vidéo 512 px) + quelques ko de signaux | 1 000 soudures par jour : environ 1 Go par jour |
 
-Le lien caméra est souvent le premier goulot : au-delà de quelques secondes de cycle, prévoir du 10 GbE ou
-réduire le volume enregistré.
+Avec une liaison 10 GbE, le transfert pèse peu (moins d'une seconde) : **le calcul est le poste dominant**, et
+c'est lui qu'il faut optimiser si le temps de cycle est court (section 6). Traiter les images au fil du transfert
+plutôt qu'après permettrait de recouvrir les deux et de ramener le délai vers la seule durée du calcul.
 
 ## 6. Optimisations possibles
 
