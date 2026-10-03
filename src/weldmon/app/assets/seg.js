@@ -2,7 +2,8 @@
 (function () {
   "use strict";
 
-  const N_FRAMES = 164;
+  // Constantes et utilitaires ---------------------------------------------------------------------
+  const N_FRAMES = 164; // = data.N_SEG_FRAMES
   const nf = (v, d) => Number(v).toLocaleString("fr-FR", { minimumFractionDigits: d, maximumFractionDigits: d });
 
   function url(run, k, src, cls, alpha) {
@@ -16,6 +17,7 @@
     return { data: fig.data, layout: Object.assign({}, fig.layout, { shapes: [cursor] }) };
   }
 
+  // Fonctions appelées par Dash : ClientsideFunction("seg", ...) dans tabs/segmentation.py --------
   window.dash_clientside = Object.assign({}, window.dash_clientside, {
     seg: {
       render: function (run, view, k, classes, alpha, figs) {

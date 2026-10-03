@@ -1,7 +1,15 @@
-"""Transcode les AVI Photron (msmpeg4v3, 1024²) en MP4 H.264 512 px pour le web.
+"""Étape 03 : transcode les AVI Photron (msmpeg4v3, 1024²) en MP4 H.264 512 px pour le web.
 
 Chaque frame source devient une frame vidéo à 30 fps (aucune duplication ni perte) :
 l'index de frame se retrouve donc exactement via `currentTime * 30` dans le navigateur.
+Le nombre de frames de chaque MP4 est vérifié contre le .cihx ; le script échoue en cas d'écart.
+
+Une vidéo ou un poster déjà présent est sauté : pour retranscoder (nouveau réglage ffmpeg), supprimer
+d'abord les fichiers concernés.
+
+Entrées : data/interim/.../<run>.avi, data/processed/runs.parquet
+Sorties : app_data/media/videos/<run>.mp4, app_data/media/posters/<run>.jpg (image d'attente du lecteur)
+Usage   : make data (étapes 01 à 03) ; nécessite ffmpeg et ffprobe
 """
 
 import json
@@ -11,11 +19,17 @@ from concurrent.futures import ThreadPoolExecutor
 import pandas as pd
 from common import APP_DATA, PLAYBACK_FPS, PROCESSED, SIZE, video_path
 
+# Paramètres ---------------------------------------------------------------------------------------
 OUT_VIDEOS = APP_DATA / "media" / "videos"
 OUT_POSTERS = APP_DATA / "media" / "posters"
+# Réglages x264 (dans transcode) : CRF 32 et preset slower, pour des vidéos légères (moins de 2 Mo) au prix
+# d'un encodage plus lent ; une image clé par seconde de lecture (-g 30) pour se déplacer vite dans la vidéo.
+
+# Transcodage --------------------------------------------------------------------------------------
 
 
 def count_frames(path) -> int:
+    """Nombre réel de frames d'une vidéo (comptage des paquets par ffprobe)."""
     out = subprocess.run(
         [
             "ffprobe",
@@ -38,6 +52,7 @@ def count_frames(path) -> int:
 
 
 def transcode(run: dict) -> dict:
+    """Transcode un run et extrait son poster ; renvoie de quoi contrôler le résultat."""
     src = video_path(run["run_id"])
     dst = OUT_VIDEOS / f"{run['run_id']}.mp4"
     poster = OUT_POSTERS / f"{run['run_id']}.jpg"
@@ -96,6 +111,9 @@ def transcode(run: dict) -> dict:
         "n_frames": run["n_frames"],
         "mb": dst.stat().st_size / 1e6,
     }
+
+
+# Point d'entrée -----------------------------------------------------------------------------------
 
 
 def main() -> None:

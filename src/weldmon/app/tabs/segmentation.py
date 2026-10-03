@@ -1,4 +1,4 @@
-"""Onglet « Vidéo & masques » : annotations SAM2 relues vs prédictions du U-Net, frame par frame.
+"""Onglet « Segmentation IA » : annotations SAM2 relues vs prédictions du U-Net, frame par frame.
 
 Les images sont composées par la route /overlay (paramètres en liste blanche, cache) ; le
 changement de frame ne déclenche aucun callback serveur (URL calculée côté client).
@@ -10,6 +10,7 @@ from dash import ClientsideFunction, Input, Output, State, callback, clientside_
 from .. import data, theme
 from ..components import point, section_header
 
+# Constantes et textes -----------------------------------------------------------------------------
 EXPLANATIONS = [
     point(
         "La segmentation",
@@ -36,6 +37,9 @@ EXPLANATIONS = [
 # Teinte moyenne de chaque classe (lisible dans les deux thèmes).
 CHIP_COLORS = {"weld": "#9550d8", "plasma": "#dd6a1e", "spatter": "#d2448c"}
 CLASSES = [("w", "weld", "Cordon"), ("p", "plasma", "Plasma"), ("s", "spatter", "Projections")]
+
+
+# Composants ---------------------------------------------------------------------------------------
 
 
 def run_options() -> list[dict]:
@@ -131,6 +135,9 @@ def metrics_block() -> html.Div:
             ),
         ]
     )
+
+
+# Mise en page -------------------------------------------------------------------------------------
 
 
 def layout() -> html.Div:
@@ -298,6 +305,9 @@ def layout() -> html.Div:
     )
 
 
+# Courbes d'aires et d'IoU -------------------------------------------------------------------------
+
+
 def rolling_mean(values: list, window: int) -> list:
     """Moyenne glissante centrée qui ignore les valeurs absentes (classe absente des deux cartes)."""
     half, out = window // 2, []
@@ -416,6 +426,9 @@ def area_figs(run_id: str, scheme: str | None) -> dict:
         "frames": [f["frame"] for f in frames],
         "muted": t["muted"],
     }
+
+
+# Callbacks : courbes côté serveur, images et curseur côté client (assets/seg.js) ------------------
 
 
 @callback(Output("seg-figs", "data"), Input("seg-run", "value"), Input("color-scheme", "computedColorScheme"))

@@ -1,9 +1,14 @@
-"""Inférence du U-Net sur toutes les frames des 81 vidéos.
+"""Étape 06 : inférence du U-Net sur toutes les frames des 81 vidéos.
 
+Chaque vidéo est segmentée frame par frame, puis post-traitée en entier (segmodel.suppress_static). Les
+mesures sont prises en pixels à 512 px ; la conversion en mm se fait à l'étape 07.
+
+Entrées : AVI des 81 runs, models/unet.pt, data/processed/runs.parquet, labeled_frames.parquet
 Sorties :
 - data/processed/frame_features.parquet : mesures vision par frame (plasma, projections, cordon) ;
 - data/processed/preds/<run>/NNN.png : prédictions aux frames annotées (comparaison GT / IA) ;
 - app_data/media/videos/<run>_ia.mp4 : vidéo avec masques IA incrustés.
+Usage   : make infer (GPU CUDA et ffmpeg, environ 10 min sur RTX 3090)
 """
 
 import subprocess
@@ -17,16 +22,20 @@ import torch
 from common import APP_DATA, LABELED_RUNS, MODELS, PLAYBACK_FPS, PROCESSED, SIZE, video_path
 from segmodel import load_model, suppress_static, to_tensor
 
+# Paramètres ---------------------------------------------------------------------------------------
 DEVICE = "cuda"
 BATCH = 32
-MIN_SPATTER_PX = 4
+MIN_SPATTER_PX = 4  # une projection compte à partir de 4 px (en dessous : bruit)
 # Couleurs d'incrustation (BGR), identiques aux séries de l'app (thème sombre) :
 # cordon #9550d8, plasma #dd6a1e, projections #d2448c.
 OVERLAY = {1: (216, 80, 149), 2: (30, 106, 221), 3: (140, 68, 210)}
-ALPHA = 0.45
+ALPHA = 0.45  # opacité du remplissage des masques
+
+# Décodage et segmentation -------------------------------------------------------------------------
 
 
 def decode(run_id: str) -> np.ndarray:
+    """Toutes les frames d'un AVI, en niveaux de gris 512 px : (N, 512, 512) uint8."""
     cap = cv2.VideoCapture(str(video_path(run_id)))
     frames = []
     while True:
@@ -41,12 +50,16 @@ def decode(run_id: str) -> np.ndarray:
 
 @torch.no_grad()
 def segment(model, frames: np.ndarray) -> np.ndarray:
+    """Cartes de labels brutes (avant post-traitement), par lots de BATCH frames."""
     out = np.empty(frames.shape, np.uint8)
     for i in range(0, len(frames), BATCH):
         x = to_tensor(frames[i : i + BATCH]).to(DEVICE)
         with torch.autocast("cuda", dtype=torch.float16):
             out[i : i + BATCH] = model(x).argmax(1).cpu().numpy()
     return out
+
+
+# Mesures par frame --------------------------------------------------------------------------------
 
 
 def frame_features(img: np.ndarray, lab: np.ndarray) -> dict:
@@ -84,7 +97,11 @@ def frame_features(img: np.ndarray, lab: np.ndarray) -> dict:
     return f
 
 
+# Sorties visuelles --------------------------------------------------------------------------------
+
+
 def write_overlay_video(run_id: str, frames: np.ndarray, labels: np.ndarray) -> None:
+    """Vidéo web avec masques incrustés, encodée à la volée (frames envoyées à ffmpeg par un tube)."""
     dst = APP_DATA / "media" / "videos" / f"{run_id}_ia.mp4"
     proc = subprocess.Popen(
         [
@@ -134,10 +151,14 @@ def write_overlay_video(run_id: str, frames: np.ndarray, labels: np.ndarray) -> 
 
 
 def save_labeled_preds(run_id: str, labels: np.ndarray, labeled: pd.DataFrame) -> None:
+    """Prédictions aux frames annotées, pour la comparaison annotation / IA de l'app."""
     out = PROCESSED / "preds" / run_id
     out.mkdir(parents=True, exist_ok=True)
     for row in labeled[labeled.run_id == run_id].itertuples():
         cv2.imwrite(str(out / f"{row.gt_index:03d}.png"), labels[row.video_frame])
+
+
+# Point d'entrée -----------------------------------------------------------------------------------
 
 
 def main() -> None:

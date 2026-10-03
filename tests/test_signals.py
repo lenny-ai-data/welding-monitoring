@@ -1,6 +1,10 @@
+"""Tests unitaires du pipeline : signaux de 07_signals.py et métriques de segmentation, sur données synthétiques."""
+
 import numpy as np
 import pytest
 from metrics import confusion, f1, instance_matches, iou_from_confusion
+
+# Allumage, extinction et régime établi ------------------------------------------------------------
 
 
 def test_detect_on_off_ignores_single_frame_flicker(signals):
@@ -16,6 +20,25 @@ def test_detect_on_off_without_plasma(signals):
     assert signals.detect_on_off(np.zeros(300), fps=6000) is None
 
 
+def test_off_bounded_by_weld_front_arrival(signals):
+    plasma = np.zeros(600)
+    plasma[100:500] = 2000  # lueur résiduelle jusqu'à 500 alors que le cordon s'arrête vers 400
+    front = np.full(600, np.nan)
+    front[100:400] = np.linspace(40, 460, 300)
+    front[400:] = 460
+    on, off = signals.detect_on_off(plasma, fps=6000, front=front)
+    assert abs(on - 100) <= 2
+    assert 395 <= off <= 410
+
+
+def test_steady_slice_trims_transients(signals):
+    sl = signals.steady_slice(100, 300)
+    assert (sl.start, sl.stop) == (130, 290)
+
+
+# Vitesse d'avance ---------------------------------------------------------------------------------
+
+
 def test_front_slope_recovers_speed(signals):
     frames = np.arange(100, 400)
     front = 20 + 1.8 * frames + np.random.default_rng(0).normal(0, 0.5, frames.size)
@@ -24,15 +47,22 @@ def test_front_slope_recovers_speed(signals):
     assert r2 > 0.99
 
 
+# Regroupement des alarmes -------------------------------------------------------------------------
+
+
 def test_group_events_merges_consecutive_frames(signals):
     mask = np.array([0, 1, 1, 0, 0, 1, 0, 1, 1, 1], bool)
     assert signals.group_events(mask) == [(1, 2), (5, 5), (7, 9)]
     assert signals.group_events(mask, min_len=2) == [(1, 2), (7, 9)]
 
 
-def test_steady_slice_trims_transients(signals):
-    sl = signals.steady_slice(100, 300)
-    assert (sl.start, sl.stop) == (130, 290)
+def test_group_events_debounce(signals):
+    mask = np.array([1, 0, 1, 1, 0, 0, 0, 1], bool)
+    assert signals.group_events(mask, max_gap=1) == [(0, 3), (7, 7)]
+    assert signals.group_events(mask, max_gap=3) == [(0, 7)]
+
+
+# Métriques de segmentation ------------------------------------------------------------------------
 
 
 def test_iou_ignores_unlabeled_pixels():
@@ -52,20 +82,3 @@ def test_spatter_instance_matching():
     counts = instance_matches(gt, pred)
     assert counts == {"n_pred": 2, "tp_pred": 1, "n_gt": 2, "tp_gt": 1}
     assert f1(counts)["f1"] == pytest.approx(0.5)
-
-
-def test_off_bounded_by_weld_front_arrival(signals):
-    plasma = np.zeros(600)
-    plasma[100:500] = 2000  # lueur résiduelle jusqu'à 500 alors que le cordon s'arrête vers 400
-    front = np.full(600, np.nan)
-    front[100:400] = np.linspace(40, 460, 300)
-    front[400:] = 460
-    on, off = signals.detect_on_off(plasma, fps=6000, front=front)
-    assert abs(on - 100) <= 2
-    assert 395 <= off <= 410
-
-
-def test_group_events_debounce(signals):
-    mask = np.array([1, 0, 1, 1, 0, 0, 0, 1], bool)
-    assert signals.group_events(mask, max_gap=1) == [(0, 3), (7, 7)]
-    assert signals.group_events(mask, max_gap=3) == [(0, 7)]

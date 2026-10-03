@@ -12,6 +12,7 @@ from dash import ClientsideFunction, Input, Output, State, callback, clientside_
 from .. import data, theme
 from ..components import icon, point, section_header, verdict_badge
 
+# Constantes et textes -----------------------------------------------------------------------------
 DEFAULT_RUN = "DoE3_19"
 
 EXPLANATIONS = [
@@ -54,6 +55,9 @@ SHORT_LABELS = {
 }
 
 
+# Libellés et options ------------------------------------------------------------------------------
+
+
 def event_labels() -> dict[str, str]:
     rules = data.meta()["calibration"]["alarm_rules"]
     return {
@@ -76,6 +80,9 @@ def run_options() -> list[dict]:
             }
         )
     return [{"group": f"Campagne {g}", "items": items} for g, items in groups.items()]
+
+
+# Composants ---------------------------------------------------------------------------------------
 
 
 def kpi_card(key: str, label: str, unit: str) -> html.Div:
@@ -246,6 +253,9 @@ def player() -> html.Div:
     )
 
 
+# Mise en page -------------------------------------------------------------------------------------
+
+
 def layout() -> html.Div:
     default = DEFAULT_RUN if data.valid_run(DEFAULT_RUN) else data.runs()[0]["run_id"]
     return html.Div(
@@ -338,6 +348,9 @@ def layout() -> html.Div:
             dcc.Interval(id="live-tick", interval=100),
         ],
     )
+
+
+# Données envoyées au client (séries, limites, mises en page des courbes) --------------------------
 
 
 def _max(values, floor: float) -> float:
@@ -478,6 +491,9 @@ def live_payload(run_id: str, scheme: str | None) -> dict:
     }
 
 
+# Tableau des paramètres ---------------------------------------------------------------------------
+
+
 def fmt(v: float, nd: int = 1) -> str:
     return f"{v:,.{nd}f}".replace(",", " ").replace(".", ",").replace("-", "−")
 
@@ -507,6 +523,9 @@ def params_table(run: dict) -> list:
         ),
         html.Dl([item for k, v in rows for item in (html.Dt(k), html.Dd(v))], className="params-grid"),
     ]
+
+
+# Callbacks : chargement du run côté serveur, relecture côté client (assets/process.js) ------------
 
 
 @callback(

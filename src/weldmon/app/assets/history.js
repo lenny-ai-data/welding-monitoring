@@ -2,6 +2,7 @@
 (function () {
   "use strict";
 
+  // Constantes et utilitaires ---------------------------------------------------------------------
   const VERDICTS = ["all", "ok", "warn", "nok"]; // même ordre que FILTERS (tabs/history.py)
 
   // Classe d'une tuile : verdict (repris de la classe existante) + sélection + filtre.
@@ -13,6 +14,7 @@
     return cls;
   }
 
+  // Fonctions appelées par Dash : ClientsideFunction("history", ...) dans tabs/history.py ---------
   window.dash_clientside = Object.assign({}, window.dash_clientside, {
     history: {
       select: function (_clicks, clickData, flt, selected, classes) {

@@ -1,15 +1,21 @@
-"""Modèle de segmentation partagé entre entraînement et inférence."""
+"""Modèle de segmentation partagé entre entraînement (05), inférence (06) et tout réemploi des poids.
+
+Trois éléments vont toujours ensemble : l'architecture (build_model / load_model), le prétraitement
+(to_tensor) et le post-traitement à l'échelle de la vidéo (suppress_static). Voir docs/modele.md.
+"""
 
 import numpy as np
 import segmentation_models_pytorch as smp
 import torch
 
+# Architecture et prétraitement --------------------------------------------------------------------
 ENCODER = "resnet34"
 N_CLASSES = 4  # fond, cordon, plasma, projections
 MEAN, STD = 0.45, 0.25  # statistiques approx. des frames (niveaux de gris normalisés 0-1)
 
 
 def build_model(pretrained: bool = True) -> torch.nn.Module:
+    """U-Net 1 canal en entrée, 4 classes en sortie ; encodeur initialisé sur ImageNet si pretrained."""
     return smp.Unet(
         encoder_name=ENCODER,
         encoder_weights="imagenet" if pretrained else None,
@@ -27,10 +33,13 @@ def to_tensor(gray: np.ndarray) -> torch.Tensor:
 
 
 def load_model(path, device: str = "cuda") -> torch.nn.Module:
+    """Modèle prêt pour l'inférence à partir d'un state_dict (models/unet.pt) ; device peut valoir "cpu"."""
     model = build_model(pretrained=False)
     model.load_state_dict(torch.load(path, map_location=device, weights_only=True))
     return model.to(device).eval()
 
+
+# Post-traitement ----------------------------------------------------------------------------------
 
 # Fraction de frames au-delà de laquelle une détection immobile est rejetée : le panache et les
 # projections se déplacent, un reflet ou une rayure fixe non. Corrige les faux positifs dus aux

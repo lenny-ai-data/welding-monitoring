@@ -1,15 +1,18 @@
 # Laser Welding Process Monitor : orchestration du pipeline et de l'image
+# Variables ----------------------------------------------------------------------------------------
 PY := uv run --group pipeline python
 IMAGE ?= ghcr.io/lenny-ai-data/welding-monitoring
 # Trivy épinglé par digest (outil de sécurité : jamais de tag flottant).
 TRIVY := aquasec/trivy:0.75.0@sha256:af6acf9a6b85dfe389a1941505c0ce9efef52a4719635e1a962f022a3d855daa
 TAG ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 
-.PHONY: help data labels train infer features export pipeline app test lint docker docker-run scan
+.PHONY: help data labels train infer features export pipeline bench app test lint docker docker-run scan
 
+# Aide ---------------------------------------------------------------------------------------------
 help:  ## Affiche cette aide
 	@grep -E '^[a-z-]+:.*##' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-12s %s\n", $$1, $$2}'
 
+# Pipeline de données (dans l'ordre ; train, infer et bench demandent un GPU CUDA) -----------------
 data:  ## Extraction des archives, métadonnées, transcodage vidéo
 	cd pipeline && $(PY) 01_extract.py && $(PY) 02_metadata.py && $(PY) 03_transcode.py
 
@@ -30,6 +33,10 @@ export:  ## Export des artefacts légers vers app_data/
 
 pipeline: data labels train infer features export  ## Pipeline complet
 
+bench:  ## Mesure des temps d'inférence sur une vidéo (GPU)
+	cd pipeline && $(PY) bench_infer.py
+
+# Développement ------------------------------------------------------------------------------------
 app:  ## Lance l'app en local (http://127.0.0.1:8050)
 	uv run python -m weldmon.app.main
 
@@ -39,6 +46,7 @@ test:  ## Tests unitaires
 lint:  ## Lint + format check
 	uv run ruff check . && uv run ruff format --check .
 
+# Image Docker et sécurité -------------------------------------------------------------------------
 docker:  ## Construit l'image
 	docker build -t $(IMAGE):$(TAG) -t $(IMAGE):latest .
 

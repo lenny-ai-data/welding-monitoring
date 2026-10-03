@@ -8,6 +8,7 @@
 (function () {
   "use strict";
 
+  // État, constantes et utilitaires ---------------------------------------------------------------
   const state = { key: null, run: null, videoRun: null, idx: -1, advancing: false, resume: null, rate: 1, p: null };
   const KPIS = ["integrity", "power", "speed"]; // même ordre que les sorties du tick (tabs/process.py)
   const N_OUTPUTS = 4 + 1 + 3 + 3 * KPIS.length + 3;
@@ -23,7 +24,8 @@
   const video = () => document.getElementById("live-video");
   const noUpdates = () => Array(N_OUTPUTS).fill(window.dash_clientside.no_update);
 
-  // Couleur d'anneau : violet, puis doré entre 60 et 100 % de la limite, rouge au-delà d'un seuil d'alarme.
+  // Couleur des anneaux ---------------------------------------------------------------------------
+  // Violet, puis doré entre 60 et 100 % de la limite, rouge au-delà d'un seuil d'alarme.
   function hex(h) {
     return [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
   }
@@ -38,8 +40,8 @@
   }
   const ring = (r, color) => ({ "--p": Math.round(Math.min(Math.max(r, 0), 1) * 1000) / 10, "--c": color });
 
-  // ---------------------------------------------------------------------------------------------
-  // Lecteur : lecture / pause, recherche dans la timeline (souris, tactile, clavier).
+  // Lecteur ---------------------------------------------------------------------------------------
+  // Lecture / pause, recherche dans la timeline (souris, tactile, clavier).
   function togglePlay() {
     const v = video();
     if (!v) return;
@@ -103,6 +105,7 @@
     }
   });
 
+  // Synchronisation de la vidéo -------------------------------------------------------------------
   // Reprise de la position après changement de source (vidéo brute <-> masques IA) ou de run.
   document.addEventListener(
     "loadedmetadata",
@@ -145,8 +148,7 @@
   }
   window.requestAnimationFrame(animate);
 
-  // ---------------------------------------------------------------------------------------------
-  // Statut, KPI, courbes.
+  // Statut, cartes et courbes ---------------------------------------------------------------------
   function activeAlarms(p, idx) {
     const hold = Math.round((p.fps * HOLD_MS) / 1000);
     return p.events.filter((e) => e.start <= idx && idx <= e.end + hold && !["on", "off"].includes(e.type));
@@ -264,6 +266,7 @@
     ];
   }
 
+  // Journal d'événements --------------------------------------------------------------------------
   function eventItems(p, idx) {
     const icons = { on: "◉", off: "○", plasma_spike: "▲", spatter_burst: "◆", speed_deviation: "▼" };
     return p.events
@@ -282,6 +285,7 @@
       );
   }
 
+  // Fonctions appelées par Dash : ClientsideFunction("weld", ...) dans tabs/process.py ------------
   window.dash_clientside = Object.assign({}, window.dash_clientside, {
     weld: {
       videoSource: function (p, source, prodMode) {

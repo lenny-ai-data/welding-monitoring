@@ -17,6 +17,7 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 
 from . import data
 
+# Listes blanches et constantes --------------------------------------------------------------------
 MEDIA_RE = re.compile(r"^(videos/DoE[123]_\d{1,2}(_ia)?\.mp4|posters/DoE[123]_\d{1,2}\.jpg)$")
 MEDIA_MAX_AGE = 7 * 24 * 3600
 
@@ -24,6 +25,9 @@ MEDIA_MAX_AGE = 7 * 24 * 3600
 OVERLAY_COLORS = {1: (149, 80, 216), 2: (221, 106, 30), 3: (210, 68, 140)}
 DISAGREE = (208, 59, 59)
 CLASS_KEYS = {"w": 1, "p": 2, "s": 3}
+
+
+# En-têtes et routes -------------------------------------------------------------------------------
 
 
 def csp(script_hashes: list[str]) -> str:
@@ -110,6 +114,9 @@ def install(app, script_hashes: list[str]) -> None:
         except FileNotFoundError:
             abort(404)
         return Response(body, mimetype="image/jpeg", headers={"Cache-Control": f"public, max-age={MEDIA_MAX_AGE}"})
+
+
+# Composition des images de l'onglet segmentation --------------------------------------------------
 
 
 def _class_mask(labels: Image.Image, cid: int) -> Image.Image:

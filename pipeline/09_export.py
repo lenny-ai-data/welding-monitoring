@@ -1,12 +1,17 @@
-"""Exporte les artefacts légers consommés par l'app (app_data/), sans dépendance numpy/pandas côté app.
+"""Étape 09 : exporte les artefacts légers consommés par l'app (app_data/), sans numpy ni pandas côté app.
 
-app_data/
+C'est aussi ici que se décide le verdict qualité de chaque soudure et que se calculent les limites de
+vigilance affichées par l'app.
+
+Entrées : data/processed/ (runs, KPI, signaux, DoE, labels, prédictions), models/metrics.json
+Sorties : app_data/ (hors vidéos et posters, produits par les étapes 03 et 06)
   meta.json          étalonnage, modèle, attribution du dataset
-  runs.json          81 runs : facteurs, métadonnées caméra, KPI
+  runs.json          81 runs : facteurs, métadonnées caméra, KPI, verdict
   doe.json           modèles de surface de réponse
   seg_metrics.json   métriques du modèle + comparaison GT / IA frame par frame
   ts/<run>.json      signaux temporels
   media/seg/<run>/{frames/*.webp, gt/*.png, pred/*.png}
+Usage   : make export, puis make docker pour embarquer les nouveaux artefacts dans l'image
 """
 
 import json
@@ -19,6 +24,7 @@ import pandas as pd
 from common import APP_DATA, CLASSES, EVAL_RUNS, LABELED_RUNS, MODELS, PLAYBACK_FPS, PROCESSED
 from metrics import confusion, iou_from_confusion
 
+# Attribution du dataset (CC BY : auteurs, source, licence et modifications apportées) -------------
 DATASET = {
     "title": "High-Speed Laser Beam Welding Video Dataset with Weld, Plasma, and Spatter Annotations",
     "authors": "A. Darwish, M. Persson, A. Andersson Lassila, D. Lönn, S. Ericson, K. Salomonsson",
@@ -32,6 +38,7 @@ DATASET = {
     "prédictions d'un modèle de segmentation et indicateurs dérivés ajoutés.",
 }
 
+# Règles qualité -----------------------------------------------------------------------------------
 # Verdict qualité d'une soudure, à partir de ses alarmes (pics de plasma + rafales de projections).
 # Un écart de vitesse soutenu (alarme vitesse) rend la soudure NOK quel que soit le reste.
 VERDICT_OK_MAX = 10  # jusqu'à 10 alarmes : OK
@@ -40,7 +47,11 @@ SPEED_WARN_PCT = 10  # zone de vigilance sur la vitesse (l'alarme reste à ±20 
 STABILITY_QUANTILE = 0.90  # limite d'instabilité : 90e centile du CV plasma (laser ON, 81 runs)
 
 
+# Conversion JSON et verdict -----------------------------------------------------------------------
+
+
 def clean(v):
+    """Valeur numpy / pandas convertie en type JSON natif (NaN et infinis en None)."""
     if isinstance(v, float | np.floating):
         return None if not np.isfinite(v) else round(float(v), 5)
     if isinstance(v, np.integer):
@@ -53,12 +64,14 @@ def clean(v):
 
 
 def verdict(rec: dict) -> str:
+    """ok, warn ou nok d'après le nombre d'alarmes et la présence d'un écart de vitesse."""
     if rec["n_speed_deviation"] or rec["n_alarms"] > VERDICT_WARN_MAX:
         return "nok"
     return "ok" if rec["n_alarms"] <= VERDICT_OK_MAX else "warn"
 
 
 def stability_limit() -> float:
+    """Limite d'instabilité du plasma : quantile du CV glissant, laser allumé, sur les 81 runs."""
     cv = []
     for f in (PROCESSED / "ts").glob("*.json"):
         ts = json.loads(f.read_text())
@@ -66,7 +79,11 @@ def stability_limit() -> float:
     return round(float(np.quantile(cv, STABILITY_QUANTILE)), 3)
 
 
+# Exports ------------------------------------------------------------------------------------------
+
+
 def export_runs() -> list[dict]:
+    """runs.json : facteurs, caméra et KPI de chaque run, enrichis du rôle pour le modèle et du verdict."""
     runs = pd.read_parquet(PROCESSED / "runs.parquet").merge(
         pd.read_parquet(PROCESSED / "run_kpis.parquet"), on="run_id"
     )
@@ -86,6 +103,7 @@ def export_runs() -> list[dict]:
 
 
 def export_seg() -> dict:
+    """Images de comparaison annotation / IA (app_data/media/seg/) et métriques frame par frame."""
     labeled = pd.read_parquet(PROCESSED / "labeled_frames.parquet")
     fps = pd.read_parquet(PROCESSED / "runs.parquet").set_index("run_id")["fps"]
     report = json.loads((MODELS / "metrics.json").read_text())
@@ -116,6 +134,9 @@ def export_seg() -> dict:
             )
         report["runs"][run_id] = {"split": "eval" if run_id in EVAL_RUNS else "train", "frames": frames}
     return report
+
+
+# Point d'entrée -----------------------------------------------------------------------------------
 
 
 def main() -> None:

@@ -6,6 +6,7 @@ from dash import html
 from .. import data
 from ..components import point, section_header
 
+# Textes -------------------------------------------------------------------------------------------
 EXPLANATIONS = [
     point(
         "Des données réelles",
@@ -65,6 +66,9 @@ BADGE_CLASS = {
     "Calculé": "calcule",
     "Modélisé": "modelise",
 }
+
+
+# Panneaux -----------------------------------------------------------------------------------------
 
 
 def pct(v: float) -> str:
@@ -139,6 +143,9 @@ def signals_panel() -> html.Div:
             ),
         ],
     )
+
+
+# Mise en page -------------------------------------------------------------------------------------
 
 
 def layout() -> html.Div:

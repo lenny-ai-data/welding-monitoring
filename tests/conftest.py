@@ -1,3 +1,5 @@
+"""Configuration pytest : accès aux scripts du pipeline, dont les noms commencent par un numéro."""
+
 import importlib
 import sys
 from pathlib import Path

@@ -12,6 +12,10 @@ vitesse du front en px/s. Les écarts run par run à la consigne sont ensuite de
 Le front du cordon est robustifié : une position n'est retenue que si elle reste proche du
 panache de plasma (qui suit le laser), puis filtrée par médiane glissante ; la vitesse de régime
 est la pente de Theil-Sen (insensible aux valeurs aberrantes résiduelles).
+
+Entrées : data/processed/runs.parquet, frame_features.parquet
+Sorties : data/processed/ts/<run>.json (signaux, un point par frame), run_kpis.parquet, calibration.json
+Usage   : make features (étapes 07 et 08)
 """
 
 import json
@@ -22,6 +26,8 @@ from common import PROCESSED
 from scipy.signal import savgol_filter
 from scipy.stats import theilslopes
 
+# Paramètres ---------------------------------------------------------------------------------------
+# Les durées sont en millisecondes de procédé, converties en nombre de frames selon la cadence du run.
 PLASMA_SMOOTH_MS = 2.0  # moyenne glissante causale affichée sur le plasma
 PLASMA_MIN_PX = 150  # aire minimale (px à 512, ~0,2 mm²) pour considérer le plasma présent
 ON_WINDOW_MS = 1.5  # fenêtre de lissage de la détection allumage / extinction
@@ -30,13 +36,16 @@ STAB_WINDOW_MS = 5.0  # fenêtre du coefficient de variation glissant du plasma
 SPEED_TOL = 0.20  # écart de vitesse toléré avant alarme (bruit de mesure médian ~5 %)
 ALARM_MERGE_MS = 1.0  # deux alarmes de même type à moins de 1 ms d'écart sont fusionnées
 SPEED_ALARM_MS = 5.0  # durée minimale d'un écart de vitesse pour lever une alarme
-SPIKE_SIGMA = 3.0
+SPIKE_SIGMA = 3.0  # pic de plasma : au-delà de médiane + 3 écarts-types robustes (régime établi du run)
 FRONT_GATE_PX = 60  # écart maximal front du cordon / centre du panache (px à 512, ~2 mm)
 FRONT_MEDIAN_MS = 1.5  # fenêtre de la médiane glissante sur le front
 FRONT_END_TOL_PX = 4  # le front est « arrivé » à moins de 4 px de sa position finale
 
+# Allumage, front du cordon et régime établi -------------------------------------------------------
+
 
 def frames_for(ms: float, fps: int, odd: bool = False) -> int:
+    """Durée en ms convertie en nombre de frames (au moins 3, impair si demandé pour un filtre centré)."""
     n = max(3, int(round(ms * fps / 1000)))
     return n + 1 if odd and n % 2 == 0 else n
 
@@ -97,7 +106,12 @@ def steady_slice(on: int, off: int) -> slice:
     return slice(on + int(0.15 * span), off - int(0.05 * span))
 
 
+# Étalonnage pixels / mm ---------------------------------------------------------------------------
+
+
 def calibrate(runs: pd.DataFrame, feats: pd.DataFrame) -> tuple[dict, pd.DataFrame]:
+    """Échelle mm/px par série : médiane, sur les runs dont le front est bien rectiligne (R² > 0,95), du
+    rapport vitesse de consigne / vitesse du front. Renvoie les échelles et le détail par run."""
     rows = []
     for run in runs.itertuples():
         f = feats[feats.run_id == run.run_id].sort_values("frame")
@@ -134,6 +148,9 @@ def calibrate(runs: pd.DataFrame, feats: pd.DataFrame) -> tuple[dict, pd.DataFra
     return scales, cal
 
 
+# Événements ---------------------------------------------------------------------------------------
+
+
 def group_events(mask: np.ndarray, min_len: int = 1, max_gap: int = 0) -> list[tuple[int, int]]:
     """Regroupe les frames consécutives d'un masque booléen en (début, fin).
 
@@ -152,7 +169,13 @@ def group_events(mask: np.ndarray, min_len: int = 1, max_gap: int = 0) -> list[t
     return [(s, e) for s, e in events if e - s + 1 >= min_len]
 
 
+# Signaux et KPI d'un run --------------------------------------------------------------------------
+
+
 def run_signals(run, f: pd.DataFrame, scale: float, spatter_burst: int) -> tuple[dict, dict]:
+    """Signaux temporels (un point par frame, avec les événements) et KPI de régime établi d'un run.
+
+    Format des deux sorties : docs/donnees.md (ts/<run>.json et run_kpis.parquet)."""
     fps, n = run.fps, len(f)
     frame = f.frame.to_numpy()
     t_ms = frame / fps * 1000
@@ -162,7 +185,7 @@ def run_signals(run, f: pd.DataFrame, scale: float, spatter_burst: int) -> tuple
     on, off = window if window else (n, n)
     is_on = (frame >= on) & (frame <= off)
 
-    # Front du cordon robustifié, interpolé sur la phase ON, lissé puis dérivé.
+    # Vitesse : front du cordon robustifié, interpolé sur la phase ON, lissé puis dérivé.
     speed = np.full(n, np.nan)
     sg = frames_for(SPEED_WINDOW_MS, fps, odd=True)
     valid = is_on & ~np.isnan(front)
@@ -174,6 +197,7 @@ def run_signals(run, f: pd.DataFrame, scale: float, spatter_burst: int) -> tuple
         speed[idx[: sg // 2]] = np.nan  # bords du filtre peu fiables
         speed[idx[-(sg // 2) :]] = np.nan
 
+    # Plasma : aire, moyenne glissante, instabilité (coefficient de variation glissant).
     plasma_mm2 = plasma_px * scale**2
     # Moyenne glissante causale (seules les frames passées) : ce qu'afficherait un moniteur en ligne.
     plasma_smooth = (
@@ -186,6 +210,7 @@ def run_signals(run, f: pd.DataFrame, scale: float, spatter_burst: int) -> tuple
     roll = pd.Series(np.where(is_on, plasma_mm2, np.nan)).rolling(stab_win, center=True, min_periods=3)
     plasma_cv = (roll.std() / roll.mean()).to_numpy()
 
+    # Cordon : longueur soudée, du début du cordon jusqu'au front.
     x0 = (
         pd.Series(f.weld_x0.to_numpy(float))
         .rolling(frames_for(FRONT_MEDIAN_MS, fps), center=True, min_periods=1)
@@ -251,7 +276,9 @@ def run_signals(run, f: pd.DataFrame, scale: float, spatter_burst: int) -> tuple
             "n_speed_deviation": sum(e["type"] == "speed_deviation" for e in events),
         }
 
+    # Sérialisation JSON ------------------------------------------------------------------------
     def col(a, nd):
+        """Liste arrondie, NaN remplacés par None (null en JSON)."""
         return [None if not np.isfinite(v) else round(float(v), nd) for v in a]
 
     ts = {
@@ -270,6 +297,9 @@ def run_signals(run, f: pd.DataFrame, scale: float, spatter_burst: int) -> tuple
         "events": events,
     }
     return ts, kpi
+
+
+# Point d'entrée -----------------------------------------------------------------------------------
 
 
 def main() -> None:

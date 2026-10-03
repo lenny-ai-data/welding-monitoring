@@ -11,6 +11,7 @@ from dash import ALL, ClientsideFunction, Input, Output, State, callback, client
 from .. import data, theme
 from ..components import VERDICTS, icon, point, section_header, verdict_badge
 
+# Constantes et textes -----------------------------------------------------------------------------
 DEFAULT_RUN = "DoE3_19"
 CAMPAIGNS = ["DoE3", "DoE2", "DoE1"]  # la plus récente d'abord
 FILTERS = [("all", "Soudures contrôlées", "layout-grid"), *((k, lbl, ic) for k, (lbl, ic) in VERDICTS.items())]
@@ -34,6 +35,9 @@ EXPLANATIONS = [
 ]
 
 
+# Ordre des soudures -------------------------------------------------------------------------------
+
+
 def runs_sorted() -> list[dict]:
     order = {s: i for i, s in enumerate(CAMPAIGNS)}
     return sorted(data.runs(), key=lambda r: (order[r["serie"]], r["point"]))
@@ -41,6 +45,9 @@ def runs_sorted() -> list[dict]:
 
 def chronological() -> list[dict]:
     return sorted(data.runs(), key=lambda r: r["recorded_at"])
+
+
+# Composants ---------------------------------------------------------------------------------------
 
 
 def summary_cards() -> html.Div:
@@ -125,6 +132,9 @@ def campaign_block(serie: str) -> html.Div:
     )
 
 
+# Mise en page -------------------------------------------------------------------------------------
+
+
 def layout() -> html.Div:
     return html.Div(
         className="tab-body",
@@ -189,6 +199,9 @@ def layout() -> html.Div:
             dcc.Store(id="hist-filter", data="all"),
         ],
     )
+
+
+# Détail d'une soudure -----------------------------------------------------------------------------
 
 
 def fmt(v, nd=1, unit="") -> str:
@@ -272,6 +285,9 @@ def detail(run: dict) -> list:
             ],
         ),
     ]
+
+
+# Courbe des alarmes -------------------------------------------------------------------------------
 
 
 def trend_figure(selected: str, flt: str, scheme) -> dict:
@@ -374,6 +390,9 @@ def trend_figure(selected: str, flt: str, scheme) -> dict:
     )
     layout["yaxis"] = theme.axis(t, range=[0, ymax], nticks=4, ticks="", showline=False, fixedrange=True)
     return {"data": traces, "layout": layout}
+
+
+# Callbacks : détail et courbe côté serveur, sélection et filtre côté client (assets/history.js) ---
 
 
 @callback(

@@ -1,8 +1,12 @@
-"""Modèles de surface de réponse (Box-Behnken, 4 facteurs) sur les KPI vision.
+"""Étape 08 : modèles de surface de réponse (Box-Behnken, 4 facteurs) sur les KPI vision.
 
 Modèle quadratique complet en facteurs codés (-1, 0, +1) + effet de série (DoE1/2/3) :
 y = b0 + Σ bi·xi + Σ bii·xi² + Σ bij·xi·xj + série. Ajusté par moindres carrés sur les 81 runs.
 Les coefficients sont exportés : l'app recalcule les contours sans numpy.
+
+Entrées : data/processed/runs.parquet, run_kpis.parquet
+Sorties : data/processed/doe.json (structure décrite dans docs/donnees.md)
+Usage   : make features (étapes 07 et 08)
 """
 
 import itertools
@@ -13,13 +17,15 @@ import pandas as pd
 from common import PROCESSED
 from scipy import stats
 
+# Facteurs et indicateurs modélisés ----------------------------------------------------------------
+# L'angle d'inclinaison découle de la translation PFO Y : il n'est pas un facteur à part.
 FACTORS = {  # nom : (colonne, centre, demi-étendue, libellé, unité)
     "P": ("power_w", 3500, 500, "Puissance", "W"),
     "v": ("feedrate_mm_s", 200, 50, "Vitesse d'avance", "mm/s"),
     "f": ("defocus_mm", 0.0, 0.2, "Défocalisation", "mm"),
     "y": ("pfo_y_mm", 45, 20, "Translation PFO Y", "mm"),
 }
-KPIS = {
+KPIS = {  # colonne de run_kpis.parquet : (libellé, unité)
     "plasma_mean_mm2": ("Aire moyenne du plasma", "mm²"),
     "plasma_cv": ("Instabilité du plasma (CV)", ""),
     "plasma_height_mm": ("Hauteur du panache", "mm"),
@@ -29,7 +35,11 @@ KPIS = {
 }
 
 
+# Modèle quadratique -------------------------------------------------------------------------------
+
+
 def terms(names: list[str]) -> list[tuple[str, ...]]:
+    """Termes du modèle : linéaires, carrés, puis interactions deux à deux."""
     lin = [(a,) for a in names]
     quad = [(a, a) for a in names]
     inter = list(itertools.combinations(names, 2))
@@ -37,6 +47,7 @@ def terms(names: list[str]) -> list[tuple[str, ...]]:
 
 
 def design_matrix(coded: pd.DataFrame, series: pd.Series, model_terms) -> tuple[np.ndarray, list[str]]:
+    """Matrice du modèle (intercept, termes, indicatrices de série DoE2 et DoE3) et libellés des colonnes."""
     cols = [np.ones(len(coded))]
     labels = ["intercept"]
     for t in model_terms:
@@ -49,6 +60,7 @@ def design_matrix(coded: pd.DataFrame, series: pd.Series, model_terms) -> tuple[
 
 
 def fit(X: np.ndarray, y: np.ndarray) -> dict:
+    """Moindres carrés ordinaires : coefficients, erreurs types, tests t, R², R² ajusté, RMSE."""
     beta, *_ = np.linalg.lstsq(X, y, rcond=None)
     resid = y - X @ beta
     n, p = X.shape
@@ -69,6 +81,9 @@ def fit(X: np.ndarray, y: np.ndarray) -> dict:
         "rmse": float(np.sqrt(sigma2)),
         "dof": dof,
     }
+
+
+# Point d'entrée -----------------------------------------------------------------------------------
 
 
 def main() -> None:
