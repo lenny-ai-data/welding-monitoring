@@ -1,9 +1,16 @@
 # Laser Welding Process Monitor
 
-Dashboard de **monitoring de production** d'un procédé de soudage laser, construit sur 81 soudures réelles filmées
-en caméra ultra-rapide. Il couvre le suivi qualité de chaque soudure, la relecture image par image avec ses
-signaux de procédé, la segmentation IA du cordon, du plasma et des projections, et l'analyse statistique du plan
-d'expériences.
+Monitoring de production d'un procédé de soudage laser, construit sur 81 soudures réelles filmées en caméra
+ultra-rapide. Le projet a **deux volets distincts** :
+
+1. **Un modèle d'IA et sa chaîne de mesure, exécutés hors ligne** (`pipeline/`, GPU). Un U-Net de segmentation
+   est entraîné sur les vidéos annotées, puis **appliqué à chacune des 59 830 images des 81 vidéos**. Ses masques
+   (cordon, plasma, projections) sont convertis en mesures physiques, en signaux de procédé, en alarmes et en
+   verdict qualité par soudure.
+2. **Un dashboard de restitution léger, conçu pour la démonstration** (`src/`, image Docker sans torch). Il
+   présente ces résultats comme un poste de monitoring de production : suivi qualité, relecture image par image
+   avec les masques et les courbes, analyses statistiques. Il ne fait tourner aucun modèle : il lit les sorties
+   de l'inférence, calculées une fois pour toutes.
 
 > Projet personnel de [Lenny Jacquinot](https://www.linkedin.com/in/lenny-jacquinot-ai-engineer/), IA & Data pour l'industrie.
 
@@ -33,20 +40,43 @@ Ce document est le point d'entrée pour reprendre le projet. Les détails sont d
 
 ## 1. Périmètre
 
-**Ce que fait le projet**
+### Volet 1 : modèle et chaîne de mesure (hors ligne)
 
-- Rejoue une campagne de 81 soudures (3 séries de 27 essais, plan Box-Behnken à 4 facteurs) comme une ligne de
-  production : verdict OK / OK avec warning / NOK par soudure, relecture vidéo ralentie environ 200 fois avec
-  les courbes synchronisées.
-- Segmente chaque image avec un U-Net entraîné pour l'occasion (cordon, panache de plasma, projections) et en
-  tire des mesures physiques : aire et hauteur du plasma, nombre de projections, longueur et largeur du cordon,
-  vitesse d'avance réelle.
-- Modélise l'effet des paramètres procédé sur ces indicateurs (surfaces de réponse quadratiques, effets,
-  carte de contrôle des résidus).
+- **Entraînement** d'un U-Net (encodeur ResNet34) sur 8 vidéos annotées, avec un découpage par vidéo et une
+  évaluation sur 2 vidéos jamais vues, comparée à une baseline de vision classique.
+- **Inférence sur la totalité des données** : chaque frame des 81 vidéos est segmentée (étape `06_infer`).
+  Les vidéos avec masques incrustés affichées par le dashboard sont la sortie brute du modèle, image par image.
+- **Mesures dérivées des masques** : aire et hauteur du panache de plasma, nombre de projections, longueur et
+  largeur du cordon, vitesse d'avance réelle (suivi du front du cordon), avec un étalonnage pixels / mm par série.
+- **Qualification** : alarmes (pics de plasma, rafales de projections, écarts de vitesse), verdict OK / OK avec
+  warning / NOK par soudure, et modèles de surface de réponse reliant les paramètres procédé aux indicateurs.
 
-**Ce qu'il ne fait pas**
+L'ensemble se reconstruit avec `make pipeline` (environ 45 min sur RTX 3090).
 
-- Ce n'est pas un monitoring temps réel branché sur une machine : tout est précalculé, puis rejoué.
+### Volet 2 : dashboard de restitution (en ligne)
+
+Le dashboard rejoue la campagne comme une ligne de production : verdict de chaque soudure, relecture ralentie
+environ 200 fois avec les courbes synchronisées, comparaison annotation / prédiction, analyses du plan
+d'expériences.
+
+**Pourquoi il n'exécute pas le modèle** : c'est un choix de conception pour une démonstration publique. Les 81
+vidéos sont connues d'avance ; les segmenter une fois hors ligne donne exactement les mêmes résultats que les
+segmenter à chaque visite, sans GPU côté serveur. L'image reste légère (ni torch, ni numpy), la réponse est
+immédiate, le coût d'hébergement quasi nul et la surface d'attaque minimale. Tout ce que le dashboard affiche
+(masques, courbes, alarmes, verdicts) provient bien du modèle.
+
+### Et sur une vraie ligne de production ?
+
+Le découpage du code correspond déjà à celui d'un déploiement réel : une brique d'inférence près de la caméra
+(`segmodel.py`, mesures de `06_infer.py`, signaux de `07_signals.py`) qui produit des signaux, et une brique de
+restitution qui les affiche. En production, la première tournerait en continu sur un poste équipé d'un GPU et le
+dashboard lirait ses sorties au fil de l'eau au lieu de les rejouer. Le principal travail restant serait de
+rendre les traitements **causaux** : plusieurs d'entre eux exploitent aujourd'hui la vidéo entière (rejet des
+détections immobiles, seuil de pic de plasma calculé sur le régime établi, filtres centrés sur la vitesse et
+l'instabilité), ce qu'un système en ligne ne peut pas faire.
+
+### Ce que le projet ne couvre pas
+
 - Le dataset ne contient **aucun log capteur**. Puissance et vitesse affichées sont les **consignes** du plan
   d'expériences, appliquées entre l'allumage et l'extinction détectés à l'image. Toutes les autres courbes sont
   mesurées par vision.
@@ -259,9 +289,11 @@ peuvent légèrement bouger, et avec eux le verdict des soudures proches d'une l
 
 ## 9. Application
 
-Principe : **tout est précalculé**. Le serveur ne sert que la mise en page et des fichiers statiques. La
-relecture tourne dans le navigateur (callbacks clientside qui lisent `video.currentTime`), sans aller-retour
-serveur pendant la lecture. Conséquences : charge serveur quasi nulle, image légère, surface d'attaque minimale.
+Principe : **tout est précalculé**. L'inférence du modèle a lieu dans le pipeline (étape `06_infer`), pas dans
+l'app (voir [Périmètre](#volet-2--dashboard-de-restitution-en-ligne)). Le serveur ne sert que la mise en page et
+des fichiers statiques. La relecture tourne dans le navigateur (callbacks clientside qui lisent
+`video.currentTime`), sans aller-retour serveur pendant la lecture. Conséquences : charge serveur quasi nulle,
+image légère, surface d'attaque minimale.
 
 | Onglet | Ancre | Module | Contenu |
 |---|---|---|---|
