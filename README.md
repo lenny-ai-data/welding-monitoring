@@ -12,6 +12,10 @@ ultra-rapide. Le projet a **deux volets distincts** :
    avec les masques et les courbes, analyses statistiques. Il ne fait tourner aucun modèle : il lit les sorties
    de l'inférence, calculées une fois pour toutes.
 
+![Onglet Monitoring process : relecture d'une soudure avec les masques du modèle, cartes d'état et signaux de procédé](docs/images/monitoring-process.png)
+
+*Onglet Monitoring process : relecture de la soudure DoE1 essai 24 avec les masques IA (cordon, plasma, projections), l'état du tir, les alarmes et les signaux mesurés à l'image.*
+
 > Projet personnel de [Lenny Jacquinot](https://www.linkedin.com/in/lenny-jacquinot-ai-engineer/), IA & Data pour l'industrie.
 
 Ce document est le point d'entrée pour reprendre le projet. Les détails sont dans [`docs/`](docs/) :
