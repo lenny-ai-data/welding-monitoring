@@ -375,10 +375,10 @@ def chart_layouts(run: dict, ts: dict, scheme) -> dict:
             shapes=list(shapes),
             annotations=list(annotations),
         )
-        lay["xaxis"] = theme.xaxis(t, range=[0, duration], nticks=7, fixedrange=True)
+        lay["xaxis"] = theme.xaxis(t, range=[0, duration], nticks=7)
         if x_title:
             lay["xaxis"]["title"] |= {"text": x_title, "standoff": 6}
-        lay["yaxis"] = theme.axis(t, range=y_range, nticks=nticks, showline=False, ticks="", fixedrange=True)
+        lay["yaxis"] = theme.axis(t, range=y_range, nticks=nticks, showline=False, ticks="")
         return lay
 
     def hline(y, color, dash="dash"):

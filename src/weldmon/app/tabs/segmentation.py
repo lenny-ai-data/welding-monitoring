@@ -350,9 +350,7 @@ def area_figs(run_id: str, scheme: str | None) -> dict:
         top = 0.93 - 0.93 * (i - 1) / n
         domain = [top - 0.93 / n + 0.07, top - 0.03]
         axis_name = "yaxis" if i == 1 else f"yaxis{i}"
-        layout[axis_name] = theme.axis(
-            t, domain=domain, anchor="x", nticks=3, title={"text": "mm²", "standoff": 2}, fixedrange=True
-        )
+        layout[axis_name] = theme.axis(t, domain=domain, anchor="x", nticks=3, title={"text": "mm²", "standoff": 2})
         annotations.append(
             {
                 "text": label,
@@ -403,7 +401,7 @@ def area_figs(run_id: str, scheme: str | None) -> dict:
         legend={"orientation": "h", "y": 1.02, "yanchor": "bottom", "x": 0, "font": {"color": t["text2"]}},
     )
     iou_layout["xaxis"] = theme.xaxis(t, title={"text": "Temps de procédé (ms)"})
-    iou_layout["yaxis"] = theme.axis(t, range=[0, 1.05], tickformat=".0%", nticks=4, fixedrange=True)
+    iou_layout["yaxis"] = theme.axis(t, range=[0, 1.05], tickformat=".0%", nticks=4)
     # Moyenne glissante sur 9 frames annotées (~36 frames caméra) : l'IoU d'objets minuscules
     # (projections) varie trop d'une frame à l'autre pour être lisible brute.
     iou_traces = [

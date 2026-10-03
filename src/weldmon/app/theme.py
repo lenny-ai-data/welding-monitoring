@@ -129,8 +129,12 @@ def verdict_colors(scheme: str | None) -> dict:
 
 
 def axis(t: dict, **kw) -> dict:
-    """Axe épuré (style des courbes du monitoring) : grille horizontale légère, valeurs, pas de trait."""
+    """Axe épuré (style des courbes du monitoring) : grille horizontale légère, valeurs, pas de trait.
+
+    Axe fixe (fixedrange) : aucun graphe de l'app ne se zoome ni ne se déplace à la souris, le cadrage
+    est toujours celui choisi par le code."""
     return {
+        "fixedrange": True,
         "gridcolor": t["grid"],
         "linecolor": t["axis"],
         "zerolinecolor": t["grid"],
@@ -163,6 +167,7 @@ def base_layout(scheme: str | None, **kw) -> dict:
         "xaxis": xaxis(t),
         "yaxis": axis(t),
         "hovermode": "x unified",
+        "dragmode": False,  # pas de sélection ni de zoom au glisser
         "separators": ", ",
     }
     layout.update(kw)
