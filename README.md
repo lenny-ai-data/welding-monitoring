@@ -37,8 +37,7 @@ Ce document est le point d'entrée pour reprendre le projet. Les détails sont d
 9. [Signaux, alarmes et verdict qualité](#9-signaux-alarmes-et-verdict-qualité)
 10. [Application](#10-application)
 11. [Qualité : tests, lint, CI](#11-qualité--tests-lint-ci)
-12. [Limites connues et pistes](#12-limites-connues-et-pistes)
-13. [Licence et attribution](#13-licence-et-attribution)
+12. [Licence et attribution](#13-licence-et-attribution)
 
 ## 1. Périmètre
 
@@ -205,17 +204,17 @@ Le détail de chaque fichier (colonnes, unités, script producteur) est dans [do
 Chaque étape est un script autonome de `pipeline/`, lancé depuis ce dossier (`make` s'en charge). Elles
 s'enchaînent dans l'ordre des numéros ; chacune lit les sorties des précédentes.
 
-| Étape | Cible `make` | Entrées | Sorties | GPU |
+| Étape | Objectif | Cible `make` | Entrées | Sorties |
 |---|---|---|---|---|
-| `01_extract` | `data` | archives Zenodo | `data/interim/` | |
-| `02_metadata` | `data` | xlsx, `.cihx` | `processed/runs.parquet` (81 runs : facteurs, caméra, ordre) | |
-| `03_transcode` | `data` | AVI | `app_data/media/videos/<run>.mp4`, `posters/<run>.jpg` | |
-| `04_labels` | `labels` | annotations SAM2, AVI | `processed/labels/<run>/{frames,masks}`, `labeled_frames.parquet`, `label_instances.parquet` | |
-| `05_train_seg` | `train` | labels | `models/unet.pt`, `history.csv`, `metrics.json` | oui, environ 15 min |
-| `06_infer` | `infer` | AVI, `unet.pt` | `processed/frame_features.parquet`, `processed/preds/`, `app_data/media/videos/<run>_ia.mp4` | oui, environ 10 min |
-| `07_signals` | `features` | mesures par frame | `processed/ts/<run>.json`, `run_kpis.parquet`, `calibration.json` | |
-| `08_doe` | `features` | runs + KPI | `processed/doe.json` | |
-| `09_export` | `export` | tout ce qui précède | `app_data/` (JSON, images de comparaison) | |
+| `01_extract` | Décompresser les archives Zenodo, sans aucune transformation | `data` | archives Zenodo | `data/interim/` |
+| `02_metadata` | Construire la table des 81 soudures : paramètres du plan d'expériences, ordre de soudage, métadonnées caméra (cadence, nombre d'images, horodatage) | `data` | xlsx, `.cihx` | `processed/runs.parquet` |
+| `03_transcode` | Convertir les vidéos caméra en vidéos web légères (512 px, une image caméra par image vidéo) et extraire une image d'attente par vidéo | `data` | AVI | `app_data/media/videos/<run>.mp4`, `posters/<run>.jpg` |
+| `04_labels` | Transformer les annotations SAM2 des 8 vidéos annotées en une carte de classes par image (fond, cordon, plasma, projections), recalée et vérifiée sur la vidéo | `labels` | annotations SAM2, AVI | `processed/labels/<run>/{frames,masks}`, `labeled_frames.parquet`, `label_instances.parquet` |
+| `05_train_seg` | Entraîner le U-Net, l'évaluer sur 2 vidéos jamais vues et le comparer à une baseline sans apprentissage (GPU, environ 15 min) | `train` | labels | `models/unet.pt`, `history.csv`, `metrics.json` |
+| `06_infer` | Segmenter chacune des images des 81 vidéos, en tirer les mesures brutes par image (plasma, projections, cordon) et produire les vidéos avec masques (GPU, environ 10 min) | `infer` | AVI, `unet.pt` | `processed/frame_features.parquet`, `processed/preds/`, `app_data/media/videos/<run>_ia.mp4` |
+| `07_signals` | Étalonner pixels / mm, construire les signaux de procédé (vitesse, plasma, projections, cordon), détecter allumage, extinction et alarmes, calculer les indicateurs de chaque soudure | `features` | mesures par image | `processed/ts/<run>.json`, `run_kpis.parquet`, `calibration.json` |
+| `08_doe` | Ajuster les modèles de surface de réponse reliant les paramètres procédé aux indicateurs | `features` | runs + indicateurs | `processed/doe.json` |
+| `09_export` | Décider le verdict de chaque soudure, calculer les limites de vigilance et exporter les fichiers légers lus par l'app | `export` | tout ce qui précède | `app_data/` (JSON, images de comparaison) |
 
 **Relancer une partie du pipeline** : après une modification, relancer l'étape modifiée et toutes les
 suivantes. Exemples courants :
@@ -341,19 +340,7 @@ make scan                 # Trivy sur l'image + pip-audit des dépendances runti
   rendu des onglets. **Sautés automatiquement si `app_data/` est absent** (cas de la CI).
 - CI GitHub (`.github/workflows/ci.yml`) : lint, tests, audit des dépendances runtime, sans GPU ni données.
 
-## 12. Limites connues et pistes
-
-| Limite | Conséquence | Piste |
-|---|---|---|
-| Modèle entraîné sur DoE3 seulement | mesures moins fiables sur DoE1 / DoE2 | annoter quelques frames DoE1 / DoE2 et affiner le modèle |
-| Pas de reprise d'entraînement | `05_train_seg` repart toujours des poids ImageNet | option de fine-tuning depuis `unet.pt` |
-| `DEVICE = "cuda"` en dur (05, 06) | pas d'inférence sur CPU, de toute façon trop lente (6 im/s) | option `--device` pour les tests |
-| Poids et artefacts hors dépôt | perte possible avec la machine | stockage externe (bucket, release privée) |
-| Pas de version du modèle dans les artefacts | traçabilité limitée | manifeste (hash des poids, date, données) écrit par 05 et repris par 09 |
-| Inférence non optimisée | 25 % du temps passé autour du modèle (prétraitement sur CPU) | prétraitement et argmax sur GPU, TensorRT ([docs/production.md](docs/production.md)) |
-| Reproductibilité non bit à bit | métriques très proches mais pas identiques après réentraînement | acceptable ; figer les poids livrés |
-
-## 13. Licence et attribution
+## 12. Licence et attribution
 
 - **Données** : dataset de A. Darwish, M. Persson, A. Andersson Lassila, D. Lönn, S. Ericson, K. Salomonsson
   (University of Skövde), [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/) : usage non commercial,
