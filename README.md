@@ -1,119 +1,310 @@
 # Laser Welding Process Monitor
 
-Dashboard de démonstration (Dash / Plotly) de **monitoring de production** d'un procédé de soudage laser :
-suivi qualité de 81 soudures réelles, puis relecture de chacune image par image avec ses signaux de procédé. Il
-s'appuie sur des vidéos haute vitesse réelles, sur un modèle de segmentation entraîné pour l'occasion (cordon,
-plasma, projections) et sur l'analyse statistique du plan d'expériences Box-Behnken de la campagne.
+Dashboard de **monitoring de production** d'un procédé de soudage laser, construit sur 81 soudures réelles filmées
+en caméra ultra-rapide. Il couvre le suivi qualité de chaque soudure, la relecture image par image avec ses
+signaux de procédé, la segmentation IA du cordon, du plasma et des projections, et l'analyse statistique du plan
+d'expériences.
 
 > Projet personnel de [Lenny Jacquinot](https://www.linkedin.com/in/lenny-jacquinot-ai-engineer/), IA & Data pour l'industrie.
 
-| Onglet | Contenu |
+Ce document est le point d'entrée pour reprendre le projet. Les détails sont dans [`docs/`](docs/) :
+
+| Document | Contenu |
 |---|---|
-| **Monitoring process** | Relecture d'une soudure (ralentie ×200) : lecteur avec lecture / pause et timeline des événements, cartes tir laser, intégrité (seuils franchis, anneau qui suit les seuils du verdict), puissance et vitesse, journal d'événements, courbes plasma / vitesse (bande ±10 %) / projections / cordon, enchaînement des soudures dans l'ordre réel. Tient sans défilement en plein écran 1920 × 1080. |
-| **Suivi & historique** | Verdict qualité de chaque soudure (OK / OK avec warning / NOK, d'après ses alarmes), campagne la plus récente en premier, filtres par verdict, courbe des alarmes dans l'ordre de production, détail d'une soudure et ouverture dans le monitoring. |
-| **Analyses** | Surfaces de réponse quadratiques, effets standardisés, effets principaux, carte de contrôle I-MR des résidus, à réévaluer au fil de la production. |
-| **Segmentation IA** | Annotation humaine à gauche, prédiction du U-Net ou carte des désaccords à droite, image par image. Métriques sur les vidéos d'évaluation, comparaison avec une baseline de vision classique. |
-| **Méthode** | Chaîne de traitement, modèle de segmentation, statut de chaque signal (mesuré / consigne / calculé / modélisé), licence. |
+| [docs/donnees.md](docs/donnees.md) | Dictionnaire des données : chaque fichier produit, ses colonnes, ses unités, d'où il vient |
+| [docs/modele.md](docs/modele.md) | Fiche du modèle de segmentation : données, entraînement, évaluation, rechargement, réentraînement |
+| [docs/application.md](docs/application.md) | Architecture de l'application Dash, flux de données, contrats entre Python et JavaScript |
+| [docs/exploitation.md](docs/exploitation.md) | Image Docker, déploiement, sécurité, configuration, maintenance |
 
-Navigation par barre latérale repliable (icônes seules), liens directs `#process`, `#suivi`, `#analyses`, `#seg`,
-`#about`, et un bandeau « Infos et explications » dans chaque section pour un public non spécialiste.
+## Sommaire
 
-**Verdict d'une soudure** : OK jusqu'à 10 alarmes (pics de plasma + rafales de projections), OK avec warning
-jusqu'à 15, NOK au-delà ou dès qu'un écart de vitesse soutenu (±20 % pendant 5 ms) est détecté. Limites de
-vigilance des indicateurs : vitesse ±10 % de la consigne, instabilité au 90ᵉ centile des 81 soudures.
+1. [Périmètre](#1-périmètre)
+2. [Démarrage rapide](#2-démarrage-rapide)
+3. [Prérequis](#3-prérequis)
+4. [Organisation du dépôt](#4-organisation-du-dépôt)
+5. [Données](#5-données)
+6. [Pipeline de traitement](#6-pipeline-de-traitement)
+7. [Modèle de segmentation](#7-modèle-de-segmentation)
+8. [Signaux, alarmes et verdict qualité](#8-signaux-alarmes-et-verdict-qualité)
+9. [Application](#9-application)
+10. [Qualité : tests, lint, CI](#10-qualité--tests-lint-ci)
+11. [Limites connues et pistes](#11-limites-connues-et-pistes)
+12. [Licence et attribution](#12-licence-et-attribution)
 
-## Mesures et segmentation
+## 1. Périmètre
 
-Le dataset ne contient **aucun log capteur** : puissance et vitesse sont des consignes constantes par run. Le
-dashboard les affiche comme telles, entre l'allumage et l'extinction du laser, eux-mêmes détectés à l'image.
-Toutes les autres courbes sont **mesurées par vision** :
+**Ce que fait le projet**
 
-- **Vitesse d'avance mesurée** : pente glissante de la position du front du cordon.
-- **Échelle pixels en mm** : déduite du procédé lui-même, un facteur par série car le cadrage change.
-- **Panache de plasma, projections et largeur de cordon** : issus de la segmentation de chaque frame.
+- Rejoue une campagne de 81 soudures (3 séries de 27 essais, plan Box-Behnken à 4 facteurs) comme une ligne de
+  production : verdict OK / OK avec warning / NOK par soudure, relecture vidéo ralentie environ 200 fois avec
+  les courbes synchronisées.
+- Segmente chaque image avec un U-Net entraîné pour l'occasion (cordon, panache de plasma, projections) et en
+  tire des mesures physiques : aire et hauteur du plasma, nombre de projections, longueur et largeur du cordon,
+  vitesse d'avance réelle.
+- Modélise l'effet des paramètres procédé sur ces indicateurs (surfaces de réponse quadratiques, effets,
+  carte de contrôle des résidus).
 
-Résultats principaux :
+**Ce qu'il ne fait pas**
 
-- **Évaluation sur 2 vidéos jamais vues** : IoU cordon 0,93, IoU plasma 0,68, F1 de détection des
-  projections 0,70. La baseline par seuillage atteint 0,24 d'IoU plasma et 0,04 de F1 projections.
-- **Vitesse mesurée à l'image** : elle retrouve la consigne avec un écart moyen proche de 0 % (σ ≈ 3,5 %).
-- **Largeur du cordon** (R² = 0,84) : pilotée par la puissance et la vitesse, comme attendu physiquement.
-- **Projections et stabilité du plasma** : l'effet de série domine, d'où l'intérêt d'un suivi en ligne.
+- Ce n'est pas un monitoring temps réel branché sur une machine : tout est précalculé, puis rejoué.
+- Le dataset ne contient **aucun log capteur**. Puissance et vitesse affichées sont les **consignes** du plan
+  d'expériences, appliquées entre l'allumage et l'extinction détectés à l'image. Toutes les autres courbes sont
+  mesurées par vision.
+- Le modèle n'a été entraîné que sur la série DoE3. Les séries DoE1 et DoE2 sont hors domaine (éclairage et
+  cadrage différents) ; l'app le signale par un badge.
 
-## Architecture
+**Résultats principaux**
 
-```
-data/          dataset Zenodo brut + intermédiaires (non versionné, ~11 Go)
-pipeline/      traitements hors ligne (GPU), jamais embarqués dans l'image
-  01_extract, 02_metadata, 03_transcode, 04_labels, 05_train_seg, 06_infer,
-  07_signals, 08_doe, 09_export (dans cet ordre)
-models/        poids du U-Net + métriques (non versionné)
-app_data/      artefacts légers générés pour l'app (~170 Mo, non versionné, copié dans l'image)
-src/weldmon/app/
-  __init__.py  create_app() : mise en page, thème
-  security.py  en-têtes HTTP, routes /media, /overlay, /healthz
-  data.py      accès lecture seule aux artefacts, liste blanche des runs
-  theme.py     jetons clair / sombre, violet de l'interface, couleurs de classes validées (daltonisme, contraste)
-  tabs/        history (suivi), process, segmentation, doe (analyses), about
-  assets/      CSS, logique client (process.js, history.js, seg.js, nav.js), polices Sora / JetBrains Mono et photo de profil auto-hébergées
-```
+| Indicateur | Valeur |
+|---|---|
+| IoU cordon / plasma (2 vidéos jamais vues) | 0,93 / 0,69 |
+| F1 de détection des projections | 0,72 (baseline vision classique : 0,04) |
+| Écart vitesse mesurée / consigne | moyenne proche de 0 %, σ ≈ 3,7 % |
+| R² du modèle de largeur de cordon | 0,81 |
 
-Principe : **tout est précalculé**. Le serveur ne sert que la mise en page et des fichiers statiques. Le
-replay temps réel tourne dans le navigateur, via des callbacks clientside qui lisent `video.currentTime`.
-Résultat : une charge serveur quasi nulle, une image légère, une surface d'attaque minimale.
+## 2. Démarrage rapide
 
-## Données
+Trois situations selon ce dont on dispose.
 
-*High-Speed Laser Beam Welding Video Dataset with Weld, Plasma, and Spatter Annotations*. Auteurs :
-A. Darwish, M. Persson, A. Andersson Lassila, D. Lönn, S. Ericson, K. Salomonsson (University of Skövde), 2026.
-DOI [10.5281/zenodo.22282527](https://doi.org/10.5281/zenodo.22282527), licence
-[CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/) : usage non commercial, attribution requise.
-
-Pour reproduire, télécharger les trois fichiers du dépôt Zenodo dans `data/`.
-
-## Reproduire
+**A. Les artefacts `app_data/` sont déjà présents** (machine de développement, copie d'une livraison) :
 
 ```bash
-uv sync --all-groups      # app + pipeline (torch, GPU CUDA) + dev
-make pipeline             # données -> modèle -> signaux -> app_data/   (~45 min sur RTX 3090)
-make test lint
+uv sync                   # dépendances de l'app seule
 make app                  # http://127.0.0.1:8050
 ```
 
-`make help` liste toutes les cibles. Les groupes de dépendances sont `analysis` (léger, utilisé en CI),
-`ml` (torch) et `pipeline` (les deux).
-
-## Image Docker & sécurité
+**B. Reconstruction complète depuis les données brutes** (machine avec GPU CUDA) :
 
 ```bash
-make docker               # image ghcr.io/lenny-ai-data/welding-monitoring
-make docker-run           # lancement durci en local
-make scan                 # Trivy (CRITICAL/HIGH) + pip-audit
+# 1. Télécharger les 3 fichiers de https://doi.org/10.5281/zenodo.22282527 dans data/ (noms d'origine)
+# 2. Installer et dérouler le pipeline
+uv sync --all-groups      # app + pipeline (torch CUDA) + outils de dev
+make pipeline             # environ 45 min sur RTX 3090
+make app
 ```
 
-- **Image**
-  - Multi-stage, base `python:3.12-slim` épinglée par digest.
-  - Dépendances figées par `uv.lock`, sans torch, pandas ni numpy au runtime.
-  - Utilisateur non-root (UID 10001), `HEALTHCHECK` sur `/healthz`.
-  - Compatible `--read-only`, `--cap-drop ALL`, `no-new-privileges`.
-- **Application**
-  - Aucun upload ni champ libre.
-  - Runs et frames validés par liste blanche. Les médias passent par une route dédiée (regex) qui gère les
-    requêtes Range ; les chemins inconnus renvoient 404.
-  - Dash en mode production, endpoint MCP de Dash 4 désactivé explicitement.
-- **En-têtes HTTP**
-  - CSP stricte : `script-src 'self'` + hash, `frame-ancestors 'none'`, sans `unsafe-eval`.
-  - `nosniff`, `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy`, COOP/CORP.
-  - HSTS derrière HTTPS.
-- **Vie privée**
-  - Aucun appel tiers : polices, scripts et médias sont servis localement.
-  - Ni cookie ni traceur, d'où un RGPD simple.
-- **Déploiement** : `compose.yaml` et `deploy/Caddyfile` (TLS automatique, compression, cache des médias).
-  Prévoir un rate limiting au niveau du proxy ou d'un CDN.
+**C. Image Docker** (démonstration ou mise en ligne, sans Python local) :
 
 ```bash
-DOMAIN=demo.mondomaine.fr docker compose up -d
+make docker               # nécessite app_data/, copié dans l'image
+make docker-run           # http://127.0.0.1:8050, mêmes options de durcissement qu'en production
 ```
 
-Variables d'environnement : `PORT` (8050), `WEB_CONCURRENCY` (2), `GUNICORN_THREADS` (4),
-`FORWARDED_ALLOW_IPS`, `WELDMON_TRUST_PROXY` (1).
+`make help` liste toutes les cibles.
+
+## 3. Prérequis
+
+| Outil | Version | Utilisé pour |
+|---|---|---|
+| Python | 3.12 (fixé par `.python-version`) | tout |
+| [uv](https://docs.astral.sh/uv/) | 0.11 ou plus | environnements et dépendances (`uv.lock`) |
+| ffmpeg et ffprobe | 6.x testé | transcodage vidéo (étapes 03 et 06), non installé par uv |
+| GPU NVIDIA + CUDA | testé sur RTX 3090 24 Go | entraînement et inférence (étapes 05 et 06) |
+| Docker | 24 ou plus | image de production, scan Trivy |
+
+Espace disque pour la reconstruction complète : environ **25 Go** (11,4 Go d'archives Zenodo, 12 Go une fois
+décompressées, le reste en artefacts). L'app seule n'a besoin que de `app_data/` (environ 160 Mo).
+
+Les dépendances Python sont réparties en groupes, pour ne jamais installer torch là où il ne sert pas :
+
+| Groupe | Contenu | Installé par |
+|---|---|---|
+| (principal) | Dash, Mantine, gunicorn, Pillow : le runtime de l'app | toujours, et seul dans l'image Docker |
+| `analysis` | numpy, pandas, scipy, OpenCV, pyarrow | CI, étapes du pipeline sans GPU |
+| `ml` | torch, torchvision, segmentation-models-pytorch, timm | entraînement et inférence |
+| `pipeline` | `analysis` + `ml` | `make` (cibles du pipeline) |
+| `dev` | pytest, ruff | par défaut en local |
+
+## 4. Organisation du dépôt
+
+```
+.
+├── pipeline/                 traitements hors ligne, numérotés dans l'ordre d'exécution
+│   ├── common.py             chemins, découpage train / eval, classes, constantes partagées
+│   ├── 01_extract.py ... 09_export.py
+│   ├── segmodel.py           architecture du U-Net, prétraitement, post-traitement
+│   ├── metrics.py            IoU par classe, appariement des projections
+│   └── baseline_cv.py        baseline sans apprentissage (seuillage), pour comparaison
+├── src/weldmon/app/          application Dash (seul code embarqué dans l'image)
+│   ├── __init__.py           create_app() : coque, navigation, thème
+│   ├── main.py               point d'entrée (local et gunicorn)
+│   ├── data.py               lecture seule des artefacts, liste blanche des runs
+│   ├── security.py           en-têtes HTTP, routes /media, /overlay, /healthz
+│   ├── components.py         composants partagés (en-têtes de section, badges, icônes)
+│   ├── theme.py              jetons de couleur clair / sombre, mise en page Plotly commune
+│   ├── tabs/                 un module par onglet
+│   └── assets/               CSS, logique client (*.js), polices, icônes, photo
+├── tests/                    tests unitaires (signaux, métriques) et HTTP (app)
+├── docs/                     documentation détaillée
+├── deploy/Caddyfile          reverse proxy TLS
+├── Dockerfile, compose.yaml, gunicorn.conf.py
+├── Makefile                  orchestration (pipeline, app, tests, image)
+└── pyproject.toml, uv.lock   dépendances figées
+```
+
+Non versionnés (voir `.gitignore`) : `data/` (brut et intermédiaires), `models/` (poids du U-Net) et
+`app_data/` (artefacts de l'app). Ils se régénèrent avec le pipeline.
+
+## 5. Données
+
+**Source** : *High-Speed Laser Beam Welding Video Dataset with Weld, Plasma, and Spatter Annotations*,
+University of Skövde, 2026, DOI [10.5281/zenodo.22282527](https://doi.org/10.5281/zenodo.22282527), licence
+CC BY-NC 4.0. Trois fichiers à placer dans `data/` sans les renommer :
+
+| Fichier | Taille | Contenu |
+|---|---|---|
+| `high_speed_camera_videos.zip` | 10 Go | 81 vidéos AVI Photron 1024 × 1024, 6 000 à 9 000 im/s, et leurs métadonnées `.cihx` |
+| `Labels.zip` | 1,4 Go | annotations SAM2 de 8 vidéos DoE3 (164 frames chacune) : 6 d'entraînement, 2 d'évaluation |
+| `Laser_Welding_Dataset_Metadata.xlsx` | 15 ko | plan Box-Behnken des 3 séries et ordre d'exécution |
+
+**Filiation des données** : chaque niveau est produit par le précédent, jamais modifié à la main.
+
+| Niveau | Dossier | Taille | Rôle |
+|---|---|---|---|
+| Brut | `data/*.zip`, `data/*.xlsx` | 11,4 Go | dataset Zenodo, tel que téléchargé |
+| Intermédiaire | `data/interim/` | 12 Go | contenu exact des deux archives, décompressé (aucune transformation) |
+| Traité | `data/processed/` | 190 Mo | tables des runs, labels normalisés, mesures par frame, signaux, KPI, modèles DoE |
+| Modèle | `models/` | 190 Mo | poids du U-Net, historique d'entraînement, métriques d'évaluation |
+| Application | `app_data/` | 160 Mo | artefacts légers en JSON, vidéos web, images ; seul niveau embarqué dans l'image |
+
+Le détail de chaque fichier (colonnes, unités, script producteur) est dans [docs/donnees.md](docs/donnees.md).
+
+## 6. Pipeline de traitement
+
+Chaque étape est un script autonome de `pipeline/`, lancé depuis ce dossier (`make` s'en charge). Elles
+s'enchaînent dans l'ordre des numéros ; chacune lit les sorties des précédentes.
+
+| Étape | Cible `make` | Entrées | Sorties | GPU |
+|---|---|---|---|---|
+| `01_extract` | `data` | archives Zenodo | `data/interim/` | |
+| `02_metadata` | `data` | xlsx, `.cihx` | `processed/runs.parquet` (81 runs : facteurs, caméra, ordre) | |
+| `03_transcode` | `data` | AVI | `app_data/media/videos/<run>.mp4`, `posters/<run>.jpg` | |
+| `04_labels` | `labels` | annotations SAM2, AVI | `processed/labels/<run>/{frames,masks}`, `labeled_frames.parquet`, `label_instances.parquet` | |
+| `05_train_seg` | `train` | labels | `models/unet.pt`, `history.csv`, `metrics.json` | oui, environ 15 min |
+| `06_infer` | `infer` | AVI, `unet.pt` | `processed/frame_features.parquet`, `processed/preds/`, `app_data/media/videos/<run>_ia.mp4` | oui, environ 10 min |
+| `07_signals` | `features` | mesures par frame | `processed/ts/<run>.json`, `run_kpis.parquet`, `calibration.json` | |
+| `08_doe` | `features` | runs + KPI | `processed/doe.json` | |
+| `09_export` | `export` | tout ce qui précède | `app_data/` (JSON, images de comparaison) | |
+
+**Relancer une partie du pipeline** : après une modification, relancer l'étape modifiée et toutes les
+suivantes. Exemples courants :
+
+| Modification | À relancer |
+|---|---|
+| Seuils d'alarme, fenêtres de lissage (`07_signals.py`) | `make features export` |
+| Seuils du verdict, limites de vigilance (`09_export.py`) | `make export` |
+| Facteurs ou indicateurs du DoE (`08_doe.py`) | `make features export` |
+| Post-traitement de la segmentation (`segmodel.py`) | `make infer features export` |
+| Nouvel entraînement | `make train infer features export` |
+
+Puis `make docker` pour que l'image embarque les nouveaux artefacts.
+
+**Points d'attention**
+
+- `01_extract` et `03_transcode` sautent les fichiers déjà produits. Pour retranscoder après un changement de
+  réglage ffmpeg, supprimer d'abord `app_data/media/videos/<run>.mp4` et `posters/`.
+- `make train` **écrase** `models/unet.pt`. Sauvegarder les poids avant de réentraîner. Pour réévaluer un
+  modèle existant sans l'écraser : `cd pipeline && uv run --group pipeline python 05_train_seg.py --eval-only`.
+- Les scripts s'arrêtent sur une assertion si une incohérence est détectée (ordre d'exécution incomplet,
+  frames annotées mal alignées sur la vidéo, nombre de frames transcodées différent de la source).
+
+## 7. Modèle de segmentation
+
+U-Net à encodeur ResNet34 (24,4 M de paramètres), entrée en niveaux de gris 512 × 512, 4 classes : fond,
+cordon, plasma, projections. Découpage **par vidéo**, jamais par frame, pour éviter les fuites entre images
+voisines :
+
+| Rôle | Vidéos |
+|---|---|
+| Entraînement | DoE3_9, DoE3_22, DoE3_24, DoE3_25, DoE3_26 |
+| Validation (choix du checkpoint) | DoE3_16 |
+| Évaluation finale (jamais vues) | DoE3_19, DoE3_23 |
+
+Un post-traitement à l'échelle de la vidéo (`segmodel.suppress_static`) supprime les détections immobiles
+(reflets, rayures, texture prise pour un cordon). Il fait partie intégrante du modèle : sans lui, la précision
+sur les projections tombe de 0,72 à 0,42.
+
+Les poids (`models/unet.pt`, 98 Mo) ne sont ni versionnés ni embarqués dans l'image. **En conserver une copie
+hors de la machine de développement.** Rechargement, réentraînement et ajout d'annotations :
+[docs/modele.md](docs/modele.md).
+
+## 8. Signaux, alarmes et verdict qualité
+
+Construits par `07_signals.py` à partir des mesures par frame, puis qualifiés par `09_export.py`.
+
+- **Étalonnage pixels / mm** : un facteur par série (le cadrage change), estimé comme la médiane du rapport
+  vitesse de consigne / vitesse du front du cordon en px/s. Les écarts de chaque run à la consigne restent
+  donc de vraies mesures.
+- **Allumage et extinction du laser** : détectés à l'image (présence du plasma sur une fenêtre glissante,
+  extinction bornée par l'arrivée du front du cordon).
+- **Alarmes** : pic de plasma au-delà de médiane + 3σ robuste, rafale de projections (au moins 4 visibles
+  simultanément), écart de vitesse de plus de 20 % pendant au moins 5 ms.
+- **Verdict** : OK jusqu'à 10 alarmes (pics + rafales), OK avec warning jusqu'à 15, NOK au-delà ou dès qu'une
+  alarme de vitesse est levée.
+
+**Paramètres réglables**
+
+| Paramètre | Fichier | Valeur | Effet |
+|---|---|---|---|
+| `SPIKE_SIGMA` | `07_signals.py` | 3,0 | seuil de pic de plasma (en σ robustes au-dessus de la médiane du run) |
+| quantile de rafale | `07_signals.py` (`main`) | 99 % | seuil de rafale : quantile du nombre de projections visibles, laser allumé, 81 runs (minimum 3) |
+| `SPEED_TOL` / `SPEED_ALARM_MS` | `07_signals.py` | 20 % / 5 ms | alarme d'écart de vitesse |
+| `ALARM_MERGE_MS` | `07_signals.py` | 1 ms | deux alarmes de même type plus proches sont fusionnées |
+| `VERDICT_OK_MAX` / `VERDICT_WARN_MAX` | `09_export.py` | 10 / 15 | bornes du verdict |
+| `SPEED_WARN_PCT` | `09_export.py` | 10 % | zone de vigilance (dorée) sur la vitesse |
+| `STABILITY_QUANTILE` | `09_export.py` | 90 % | limite d'instabilité du plasma : quantile du CV glissant sur les 81 runs |
+
+Le seuil de rafale et la limite d'instabilité sont calculés sur les données. Après un réentraînement, ils
+peuvent légèrement bouger, et avec eux le verdict des soudures proches d'une limite.
+
+## 9. Application
+
+Principe : **tout est précalculé**. Le serveur ne sert que la mise en page et des fichiers statiques. La
+relecture tourne dans le navigateur (callbacks clientside qui lisent `video.currentTime`), sans aller-retour
+serveur pendant la lecture. Conséquences : charge serveur quasi nulle, image légère, surface d'attaque minimale.
+
+| Onglet | Ancre | Module | Contenu |
+|---|---|---|---|
+| Monitoring process | `#process` | `tabs/process.py` + `assets/process.js` | relecture d'une soudure, cartes tir laser / intégrité / puissance / vitesse, journal, courbes |
+| Suivi & historique | `#suivi` | `tabs/history.py` + `assets/history.js` | verdict des 81 soudures, filtres, courbe des alarmes, ouverture dans le monitoring |
+| Analyses | `#analyses` | `tabs/doe.py` | surfaces de réponse, effets standardisés, effets principaux, carte I-MR des résidus |
+| Segmentation IA | `#seg` | `tabs/segmentation.py` + `assets/seg.js` | annotation humaine contre prédiction, carte des désaccords, métriques |
+| Méthode | `#about` | `tabs/about.py` | chaîne de traitement, statut de chaque signal, licence |
+
+Contrainte de mise en page : chaque page tient sans défilement en plein écran 1920 × 1080.
+
+Architecture détaillée, conventions et procédure d'ajout d'un onglet : [docs/application.md](docs/application.md).
+
+## 10. Qualité : tests, lint, CI
+
+```bash
+make test                 # pytest
+make lint                 # ruff check + ruff format --check
+make scan                 # Trivy sur l'image + pip-audit des dépendances runtime
+```
+
+- `tests/test_signals.py` : détection allumage / extinction, pente du front, regroupement d'événements,
+  métriques de segmentation. Données synthétiques, toujours exécutés.
+- `tests/test_app.py` : en-têtes de sécurité, routes média et Range, liste blanche, cohérence des verdicts,
+  rendu des onglets. **Sautés automatiquement si `app_data/` est absent** (cas de la CI).
+- CI GitHub (`.github/workflows/ci.yml`) : lint, tests, audit des dépendances runtime, sans GPU ni données.
+
+## 11. Limites connues et pistes
+
+| Limite | Conséquence | Piste |
+|---|---|---|
+| Modèle entraîné sur DoE3 seulement | mesures moins fiables sur DoE1 / DoE2 | annoter quelques frames DoE1 / DoE2 et affiner le modèle |
+| Pas de reprise d'entraînement | `05_train_seg` repart toujours des poids ImageNet | option de fine-tuning depuis `unet.pt` |
+| `DEVICE = "cuda"` en dur (05, 06) | pas d'inférence sur CPU | option `--device` |
+| Poids et artefacts hors dépôt | perte possible avec la machine | stockage externe (bucket, release privée) |
+| Pas de version du modèle dans les artefacts | traçabilité limitée | manifeste (hash des poids, date, données) écrit par 05 et repris par 09 |
+| Reproductibilité non bit à bit | métriques très proches mais pas identiques après réentraînement | acceptable ; figer les poids livrés |
+
+## 12. Licence et attribution
+
+- **Données** : dataset de A. Darwish, M. Persson, A. Andersson Lassila, D. Lönn, S. Ericson, K. Salomonsson
+  (University of Skövde), [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/) : usage non commercial,
+  attribution obligatoire. Tout ce qui est dérivé du dataset (vidéos transcodées, masques, poids du modèle,
+  `app_data/`, image Docker) hérite de cette licence.
+- **Code** : propriétaire, aucune licence open source accordée à ce stade.
+- **Polices et icônes** : Sora, JetBrains Mono (SIL OFL) et Lucide (ISC), licences dans `src/weldmon/app/assets/`.
