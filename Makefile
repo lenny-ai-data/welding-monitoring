@@ -5,8 +5,11 @@ IMAGE ?= ghcr.io/lenny-ai-data/welding-monitoring
 # Trivy épinglé par digest (outil de sécurité : jamais de tag flottant).
 TRIVY := aquasec/trivy:0.75.0@sha256:af6acf9a6b85dfe389a1941505c0ce9efef52a4719635e1a962f022a3d855daa
 TAG ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
+# Architectures de l'image publiée : serveurs x86 et ARM (Ampere, Graviton...). L'ARM se construit sous
+# émulation QEMU sur une machine x86 (paquet qemu-user-static).
+PLATFORMS ?= linux/amd64,linux/arm64
 
-.PHONY: help data labels train infer features export pipeline bench app test lint docker docker-run scan
+.PHONY: help data labels train infer features export pipeline bench app test lint docker docker-multi docker-run push scan
 
 # Aide ---------------------------------------------------------------------------------------------
 help:  ## Affiche cette aide
@@ -47,12 +50,20 @@ lint:  ## Lint + format check
 	uv run ruff check . && uv run ruff format --check .
 
 # Image Docker et sécurité -------------------------------------------------------------------------
-docker:  ## Construit l'image
+docker:  ## Construit l'image pour l'architecture de cette machine
 	docker build -t $(IMAGE):$(TAG) -t $(IMAGE):latest .
+
+docker-multi:  ## Construit l'image pour toutes les architectures de PLATFORMS (amd64 + arm64)
+	docker buildx build --platform $(PLATFORMS) -t $(IMAGE):$(TAG) -t $(IMAGE):latest --load .
 
 docker-run:  ## Lance l'image avec les options de durcissement
 	docker run --rm -p 8050:8050 --read-only --tmpfs /tmp --cap-drop ALL \
 		--security-opt no-new-privileges --memory 512m --cpus 1 $(IMAGE):latest
+
+push:  ## Pousse l'image (toutes ses architectures) sur le registre ; version taguée et arbre propre exigés
+	@case "$(TAG)" in v*-g*|*dirty*|dev) echo "Version $(TAG) non publiable : tagger un commit propre (git tag vX.Y.Z)"; exit 1;; esac
+	docker push $(IMAGE):$(TAG)
+	docker push $(IMAGE):latest
 
 scan:  ## Scan de vulnérabilités (Trivy + pip-audit)
 	docker run --rm -v /var/run/docker.sock:/var/run/docker.sock $(TRIVY) image \
