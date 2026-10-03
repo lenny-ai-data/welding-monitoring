@@ -65,15 +65,15 @@ environ 200 fois avec les courbes synchronisées, comparaison annotation / préd
 d'expériences.
 
 **Le dashboard n'a pas vocation à solliciter une inférence du modèle** : c'est un rendu léger de démonstration.
-L'image n'embarque que les résultats ce qui lui permet de rester légère. La réponse est immédiate, le coût 
+L'image n'embarque que les résultats, ce qui lui permet de rester légère. La réponse est immédiate, le coût
 d'hébergement quasi nul et la surface d'attaque minimale. Tout ce que le dashboard affiche
 (masques, courbes, alarmes, verdicts) provient du modèle.
 
 ### Architecture sur une vraie ligne de production ?
 
-L'architecture du code correspond déjà à celui d'un déploiement réel : une brique d'inférence au pied de la machine
+L'architecture du code correspond déjà à celle d'un déploiement réel : une brique d'inférence au pied de la machine
 et une brique de restitution, le dashboard. Les performances mesurées permettent d'envisager un **contrôle à chaque
-soudure**, en environ 3 s de calcul par contrôle sur un GPU (voir [section 8](#8-performances-et-passage-en-production) 
+soudure**, en environ 3 s de calcul par contrôle sur un GPU (voir [section 8](#8-performances-et-passage-en-production)
 et [docs/production.md](docs/production.md)).
 
 **Résultats principaux**
@@ -99,7 +99,7 @@ make app                  # http://127.0.0.1:8050
 **B. Reconstruction complète depuis les données brutes** (machine avec GPU CUDA) :
 
 ```bash
-# 1. Télécharger les données source https://doi.org/10.5281/zenodo.22282527 dans data/ 
+# 1. Télécharger les données source https://doi.org/10.5281/zenodo.22282527 dans data/
 # 2. Installer et dérouler le pipeline
 uv sync --all-groups      # app + pipeline
 make pipeline             # environ 45 min sur RTX 3090
@@ -173,7 +173,7 @@ Non versionnés (voir `.gitignore`) : `data/` (brut et intermédiaires), `models
 
 **Source** : *High-Speed Laser Beam Welding Video Dataset with Weld, Plasma, and Spatter Annotations*,
 University of Skövde, 2026, DOI [10.5281/zenodo.22282527](https://doi.org/10.5281/zenodo.22282527), licence
-CC BY-NC 4.0. 
+CC BY-NC 4.0.
 
 Trois fichiers à placer dans `data/` sans les renommer :
 
@@ -213,7 +213,7 @@ s'enchaînent dans l'ordre des numéros ; chacune lit les sorties des précéden
 | `09_export` | Décider le verdict de chaque soudure, calculer les limites de vigilance et exporter les fichiers légers lus par l'app | `export` | tout ce qui précède | `app_data/` (JSON, images de comparaison) |
 
 **Relancer une partie du pipeline** : après une modification, relancer l'étape modifiée et toutes les
-suivantes. 
+suivantes.
 
 ## 7. Modèle de segmentation
 
