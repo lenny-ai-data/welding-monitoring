@@ -7,7 +7,7 @@ catégorielles, validées pour la séparation daltonisme / contraste sur chaque 
 dataviz) : la couleur suit l'entité dans tous les graphiques et vidéos.
 """
 
-# Couleurs -----------------------------------------------------------------------------------------
+# Couleur de marque et jetons clair / sombre -------------------------------------------------------
 BRAND = "#8c18cc"
 
 # Nuances du violet de marque (Mantine attend 10 tons, du plus clair au plus foncé).
@@ -73,6 +73,7 @@ TOKENS = {
     },
 }
 
+# Statuts et verdicts ------------------------------------------------------------------------------
 # Statuts : échelle fixe, jamais réutilisée pour une série, toujours accompagnée d'une icône et d'un libellé.
 STATUS = {"good": "#0ca30c", "warning": "#fab219", "serious": "#ec835a", "critical": "#d03b3b"}
 
@@ -82,7 +83,8 @@ VERDICT = {
     "dark": {"ok": "#86c79f", "warn": "#d6bd82", "nok": "#e09a9a"},
 }
 
-# Échelle des surfaces de réponse : gamme « plasma » (perceptuelle, monotone), adoucie vers le fond de
+# Échelle des surfaces de réponse ------------------------------------------------------------------
+# Gamme « plasma » (perceptuelle, monotone), adoucie vers le fond de
 # page pour ne pas éblouir (voir pale_plasma).
 PLASMA_STOPS = [
     "#0d0887",
@@ -114,7 +116,7 @@ def pale_plasma(scheme: str | None) -> list:
     return [[i / n, _mix(c, page, k)] for i, c in enumerate(stops)]
 
 
-# Accès aux jetons et gabarits Plotly --------------------------------------------------------------
+# Typographie, accès aux jetons et gabarits Plotly -------------------------------------------------
 FONT = "Sora, system-ui, -apple-system, 'Segoe UI', sans-serif"
 
 

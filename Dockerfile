@@ -2,12 +2,13 @@
 # Laser Welding Process Monitor : image de production (app Dash + artefacts précalculés).
 # Le pipeline (torch, données brutes, modèle) n'est jamais embarqué : seuls src/ et app_data/ le sont.
 
+# Images de base, épinglées par digest -------------------------------------------------------------
 ARG PYTHON_IMAGE=python:3.12-alpine@sha256:0687a6bc9716edc2a6ee0fbfb0f87e7ee358b262b67c9215de91bc9b2d38ba71
 ARG UV_IMAGE=ghcr.io/astral-sh/uv:0.11.23@sha256:d0a0a753ab981624b49c97abc98821c1c09f4ca69d1ef5cee69c501be3d88479
 
 FROM ${UV_IMAGE} AS uv
 
-# --- Build : environnement virtuel figé par uv.lock (dépendances runtime uniquement) ------------
+# Build : environnement virtuel figé par uv.lock (dépendances runtime uniquement) ------------------
 FROM ${PYTHON_IMAGE} AS build
 COPY --from=uv /uv /usr/local/bin/uv
 # Pas de bytecode précompilé : -50 Mo, coût négligeable au démarrage (preload gunicorn).
@@ -30,7 +31,7 @@ RUN cd /opt/venv/lib/python3.12/site-packages \
  && rm -rf plotly/labextension plotly/package_data/widgetbundle.js plotly/package_data/datasets \
            dash/labextension dash/nbextension
 
-# --- Runtime : Alpine, non-root, aucun outil de build, fichiers applicatifs en lecture seule ----
+# Runtime : Alpine, non-root, aucun outil de build, fichiers applicatifs en lecture seule ----------
 FROM ${PYTHON_IMAGE} AS runtime
 LABEL org.opencontainers.image.title="Laser Welding Process Monitor" \
       org.opencontainers.image.description="Monitoring de soudage laser rejoué : vidéo haute vitesse, segmentation IA, DoE" \
@@ -38,6 +39,7 @@ LABEL org.opencontainers.image.title="Laser Welding Process Monitor" \
       org.opencontainers.image.source="https://github.com/lenny-ai-data/welding-monitoring" \
       org.opencontainers.image.licenses="Code: propriétaire ; données dérivées du dataset Zenodo 10.5281/zenodo.22282527 (CC BY-NC 4.0)"
 
+# Utilisateur dédié sans shell ; suppression de pip et des modules Python inutiles en production.
 RUN addgroup -S -g 10001 app \
  && adduser -S -D -H -u 10001 -G app -h /nonexistent -s /sbin/nologin app \
  && rm -rf /root/.cache /usr/local/lib/python3.12/ensurepip /usr/local/lib/python3.12/idlelib \
@@ -50,10 +52,12 @@ ENV PATH=/opt/venv/bin:$PATH \
     WELDMON_DATA=/app/app_data \
     PORT=8050
 
+# Application et artefacts précalculés.
 COPY --from=build /opt/venv /opt/venv
 COPY gunicorn.conf.py /app/gunicorn.conf.py
 COPY app_data /app/app_data
 
+# Démarrage ----------------------------------------------------------------------------------------
 WORKDIR /app
 USER 10001:10001
 EXPOSE 8050

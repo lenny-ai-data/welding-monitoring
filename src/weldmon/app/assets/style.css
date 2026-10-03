@@ -1,6 +1,7 @@
 /* Laser Welding Process Monitor : identité violette (#8C18CC), clair / sombre
    (Mantine pilote data-mantine-color-scheme). */
 
+/* Polices (auto-hébergées) --------------------------------------------------------------------- */
 @font-face {
   font-family: "Sora";
   src: url("fonts/sora-latin-wght-normal.woff2") format("woff2");
@@ -14,6 +15,7 @@
   font-display: swap;
 }
 
+/* Jetons : propriété animable, couleurs clair / sombre ----------------------------------------- */
 /* Remplissage des anneaux KPI, animable. */
 @property --p {
   syntax: "<number>";
@@ -103,6 +105,7 @@
   --shadow: none;
 }
 
+/* Base : page et icônes ------------------------------------------------------------------------ */
 html,
 body {
   background: var(--page);
@@ -145,7 +148,8 @@ body {
 .icon-triangle-alert { --icon: url("icons/triangle-alert.svg"); }
 .icon-arrow-right { --icon: url("icons/arrow-right.svg"); }
 
-/* Profil de l'auteur (photo ronde, nom, accroche) : lien vers LinkedIn. */
+/* Profil de l'auteur --------------------------------------------------------------------------- */
+/* Photo ronde, nom, accroche : lien vers LinkedIn. */
 .profile {
   display: flex;
   align-items: center;
@@ -192,7 +196,7 @@ body {
   color: var(--muted);
 }
 
-/* En-tête (mobile) --------------------------------------------------------------------------- */
+/* En-tête (mobile) ----------------------------------------------------------------------------- */
 .header {
   background: var(--surface);
   border-bottom: 1px solid var(--border);
@@ -468,7 +472,7 @@ body {
   color: var(--text);
 }
 
-/* Panneaux --------------------------------------------------------------------------------------- */
+/* Panneaux ------------------------------------------------------------------------------------- */
 .tab-body {
   padding-bottom: 0;
 }
@@ -782,7 +786,7 @@ body {
   margin: 0;
   text-align: right;
 }
-/* Monitoring process ---------------------------------------------------------------------------- */
+/* Monitoring process --------------------------------------------------------------------------- */
 /* La colonne vidéo est dimensionnée sur la hauteur d'écran : en plein écran (1920 × 1080), toute la
    page tient sans défilement, quel que soit le nombre d'événements. */
 .proc-grid {
@@ -1279,7 +1283,7 @@ body {
 .event-speed_deviation .event-icon { color: var(--alarm); }
 .event-spatter_burst .event-icon { color: var(--gold); }
 
-/* Segmentation (KPI simples) ---------------------------------------------------------------------- */
+/* Segmentation (KPI simples) ------------------------------------------------------------------- */
 .kpi-row {
   display: grid;
   grid-template-columns: repeat(6, minmax(0, 1fr));
@@ -1377,7 +1381,7 @@ body {
   margin-top: 6px;
 }
 
-/* Analyses -------------------------------------------------------------------------------------- */
+/* Analyses ------------------------------------------------------------------------------------- */
 .fit-badges {
   display: flex;
   gap: 6px;
@@ -1517,6 +1521,8 @@ body {
   .section-aside .mantine-Select-root { width: 100% !important; }
   .vp-time { display: none; }
 }
+
+/* Compléments (placés après le responsive : l'ordre compte) ------------------------------------ */
 .kpi .kpi-label {
   white-space: normal;
 }

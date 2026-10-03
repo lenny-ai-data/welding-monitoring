@@ -3,12 +3,16 @@
 import dash_mantine_components as dmc
 from dash import html
 
+# Verdicts -----------------------------------------------------------------------------------------
 # Verdict qualité d'une soudure : libellé + icône (jamais la couleur seule).
 VERDICTS = {
     "ok": ("OK", "circle-check"),
     "warn": ("OK avec warning", "triangle-alert"),
     "nok": ("NOK", "circle-x"),
 }
+
+
+# Icônes et badges ---------------------------------------------------------------------------------
 
 
 def icon(name: str, size: int = 18) -> html.Span:
@@ -23,6 +27,9 @@ def icon(name: str, size: int = 18) -> html.Span:
 def verdict_badge(verdict: str, prefix: str = "") -> html.Span:
     label, icon_name = VERDICTS[verdict]
     return html.Span([icon(icon_name, 15), prefix + label], className=f"verdict-badge v-{verdict}")
+
+
+# En-têtes de section et explications --------------------------------------------------------------
 
 
 def section_header(

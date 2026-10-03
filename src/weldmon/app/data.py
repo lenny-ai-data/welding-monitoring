@@ -10,11 +10,14 @@ import re
 from functools import cache
 from pathlib import Path
 
+# Emplacement des données et liste blanche ---------------------------------------------------------
 DATA_DIR = Path(os.environ.get("WELDMON_DATA", Path(__file__).resolve().parents[3] / "app_data"))
 MEDIA_DIR = DATA_DIR / "media"
 
 RUN_ID_RE = re.compile(r"^DoE[123]_([1-9]|1\d|2[0-7])$")
-N_SEG_FRAMES = 164
+N_SEG_FRAMES = 164  # frames annotées par vidéo (même valeur que pipeline/04_labels.py et assets/seg.js)
+
+# Lecture des artefacts (mise en cache : les fichiers ne changent pas pendant la vie du processus) -
 
 
 def _read(name: str):
@@ -45,6 +48,9 @@ def doe() -> dict:
 @cache
 def seg() -> dict:
     return _read("seg_metrics.json")
+
+
+# Runs ---------------------------------------------------------------------------------------------
 
 
 def valid_run(run_id: object) -> str | None:

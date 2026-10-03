@@ -3,6 +3,7 @@
 (function () {
   "use strict";
 
+  // Constantes et état ----------------------------------------------------------------------------
   const KEYS = ["process", "suivi", "analyses", "seg", "about"]; // même ordre que SECTIONS (app/__init__.py)
   const DEFAULT = "process"; // = DEFAULT_SECTION
   const WIDTH = { expanded: 240, collapsed: 72 }; // = NAV_WIDTH
@@ -10,6 +11,7 @@
   let current = null;
   let collapsed = null;
 
+  // Ancre de l'URL et préférence de repli de la barre ---------------------------------------------
   function fromHash() {
     const key = window.location.hash.replace("#", "");
     return KEYS.includes(key) ? key : DEFAULT;
@@ -39,7 +41,8 @@
     window.scrollTo({ top: 0 });
   }
 
-  // Soudure ouverte depuis le suivi : si elle est déjà chargée dans le lecteur, on la relance ici ;
+  // Ouverture d'une soudure depuis le suivi -------------------------------------------------------
+  // Si elle est déjà chargée dans le lecteur, on la relance ici ;
   // sinon le chargement du run s'en charge (drapeau window.weldAutoplay).
   function playIfLoaded(run) {
     const v = document.getElementById("live-video");
@@ -51,6 +54,7 @@
     }
   }
 
+  // Fonction appelée par Dash : ClientsideFunction("nav", "route") dans app/__init__.py -----------
   window.dash_clientside = Object.assign({}, window.dash_clientside, {
     nav: {
       route: function (_clicks, burgerOpened, _collapseClicks, goto, navbar) {

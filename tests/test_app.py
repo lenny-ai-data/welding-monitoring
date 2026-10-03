@@ -4,6 +4,7 @@ import pytest
 
 from weldmon.app import data
 
+# Préparation : sautés sans app_data/ (CI) ---------------------------------------------------------
 pytestmark = pytest.mark.skipif(not (data.DATA_DIR / "runs.json").exists(), reason="app_data/ absent")
 
 
@@ -12,6 +13,9 @@ def client():
     from weldmon.app import create_app
 
     return create_app().server.test_client()
+
+
+# En-têtes de sécurité -----------------------------------------------------------------------------
 
 
 def test_index_has_security_headers(client):
@@ -33,6 +37,9 @@ def test_hsts_behind_https_proxy(client):
     assert r.headers["Cross-Origin-Opener-Policy"] == "same-origin"
 
 
+# Routes et médias ---------------------------------------------------------------------------------
+
+
 def test_healthz(client):
     r = client.get("/healthz")
     assert r.status_code == 200 and r.data == b"ok"
@@ -50,6 +57,16 @@ def test_video_supports_range_requests(client):
     assert "max-age" in r.headers["Cache-Control"]
 
 
+def test_overlay_ok(client):
+    r = client.get("/overlay/DoE3_19/60.jpg?src=pred&cls=wps&a=55")
+    assert r.status_code == 200
+    assert r.headers["Content-Type"] == "image/jpeg"
+    assert r.data[:2] == b"\xff\xd8"
+
+
+# Listes blanches ----------------------------------------------------------------------------------
+
+
 @pytest.mark.parametrize(
     "path",
     [
@@ -64,13 +81,6 @@ def test_video_supports_range_requests(client):
 )
 def test_media_whitelist(client, path):
     assert client.get(path).status_code == 404
-
-
-def test_overlay_ok(client):
-    r = client.get("/overlay/DoE3_19/60.jpg?src=pred&cls=wps&a=55")
-    assert r.status_code == 200
-    assert r.headers["Content-Type"] == "image/jpeg"
-    assert r.data[:2] == b"\xff\xd8"
 
 
 @pytest.mark.parametrize(
@@ -92,6 +102,9 @@ def test_valid_run_whitelist():
     assert data.valid_run("DoE3_19") == "DoE3_19"
     for bad in ["DoE3_28", "DoE4_1", "../DoE3_19", "DoE3_19/../x", None, 42, "doe3_19"]:
         assert data.valid_run(bad) is None
+
+
+# Données exportées et rendu des onglets -----------------------------------------------------------
 
 
 def test_process_payload_shapes():

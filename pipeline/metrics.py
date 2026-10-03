@@ -3,7 +3,9 @@
 import cv2
 import numpy as np
 
-IGNORE = 255
+IGNORE = 255  # pixels non annotés, exclus du calcul
+
+# Segmentation au pixel : matrice de confusion et IoU ----------------------------------------------
 
 
 def confusion(gt: np.ndarray, pred: np.ndarray, n_classes: int) -> np.ndarray:
@@ -19,6 +21,9 @@ def iou_from_confusion(cm: np.ndarray) -> np.ndarray:
     union = cm.sum(0) + cm.sum(1) - inter
     with np.errstate(invalid="ignore", divide="ignore"):
         return inter / union
+
+
+# Détection des projections, objet par objet -------------------------------------------------------
 
 
 def components(mask: np.ndarray, min_px: int = 4) -> list[np.ndarray]:

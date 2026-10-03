@@ -1,6 +1,7 @@
 # Exemple de déploiement : app durcie derrière Caddy (TLS automatique).
 #   DOMAIN=demo.mondomaine.fr docker compose up -d
 services:
+  # Application : durcie, joignable seulement depuis le réseau interne du compose ------------------
   app:
     image: ghcr.io/lenny-ai-data/welding-monitoring:latest
     restart: unless-stopped
@@ -17,6 +18,7 @@ services:
       FORWARDED_ALLOW_IPS: "*"
     expose: ["8050"]
 
+  # Reverse proxy : TLS automatique, compression, cache des médias (deploy/Caddyfile) --------------
   caddy:
     image: caddy:2-alpine
     restart: unless-stopped
@@ -35,6 +37,7 @@ services:
     cap_add: [NET_BIND_SERVICE]
     security_opt: ["no-new-privileges:true"]
 
+# Volumes : certificats et configuration de Caddy, conservés entre deux redémarrages ---------------
 volumes:
   caddy_data:
   caddy_config:
