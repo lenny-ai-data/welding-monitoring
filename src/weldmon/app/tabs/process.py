@@ -30,7 +30,7 @@ EXPLANATIONS = [
     point(
         "Intégrité",
         "compte les seuils d'alerte franchis : pics de plasma, rafales de projections, écarts de "
-        "vitesse. OK jusqu'à 10 (OK), OK avec warning jusqu'à 15, NOK au-delà.",
+        "vitesse. OK jusqu'à 10, OK avec warning jusqu'à 15, NOK au-delà.",
     ),
     point(
         "Les courbes",
