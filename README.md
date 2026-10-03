@@ -22,10 +22,10 @@ Ce document est le point d'entrée pour reprendre le projet. Les détails sont d
 
 | Document | Contenu |
 |---|---|
-| [docs/donnees.md](docs/donnees.md) | Dictionnaire des données : chaque fichier produit, ses colonnes, ses unités, d'où il vient |
+| [docs/donnees.md](docs/donnees.md) | Dictionnaire des données : chaque fichier produit, ses colonnes, ses unités, sa provenance |
 | [docs/modele.md](docs/modele.md) | Fiche du modèle de segmentation : données, entraînement, évaluation, rechargement, réentraînement |
 | [docs/application.md](docs/application.md) | Architecture de l'application Dash, flux de données, contrats entre Python et JavaScript |
-| [docs/production.md](docs/production.md) | Temps d'inférence mesurés, architecture de production proposée, dimensionnement, points à valider |
+| [docs/production.md](docs/production.md) | Temps d'inférence, architecture de production, dimensionnement |
 | [docs/exploitation.md](docs/exploitation.md) | Image Docker, déploiement, sécurité, configuration, maintenance |
 
 ## Sommaire
@@ -64,27 +64,17 @@ Le dashboard rejoue la campagne comme une ligne de production : verdict de chaqu
 environ 200 fois avec les courbes synchronisées, comparaison annotation / prédiction, analyses du plan
 d'expériences.
 
-**Pourquoi il n'exécute pas le modèle** : c'est un choix de conception pour une démonstration publique. Les 81
-vidéos sont connues d'avance ; les segmenter une fois hors ligne donne exactement les mêmes résultats que les
-segmenter à chaque visite, sans GPU côté serveur. L'image reste légère (ni torch, ni numpy), la réponse est
-immédiate, le coût d'hébergement quasi nul et la surface d'attaque minimale. Tout ce que le dashboard affiche
-(masques, courbes, alarmes, verdicts) provient bien du modèle.
+**Le dashboard n'a pas vocation à solliciter une inférence du modèle** : c'est un rendu léger de démonstration.
+L'image n'embarque que les résultats ce qui lui permet de rester légère. La réponse est immédiate, le coût 
+d'hébergement quasi nul et la surface d'attaque minimale. Tout ce que le dashboard affiche
+(masques, courbes, alarmes, verdicts) provient du modèle.
 
-### Et sur une vraie ligne de production ?
+### Architecture sur une vraie ligne de production ?
 
-Le découpage du code correspond déjà à celui d'un déploiement réel : une brique d'inférence au pied de la machine
-(`segmodel.py`, mesures de `06_infer.py`, signaux de `07_signals.py`, règles de verdict de `09_export.py`) et une
-brique de restitution, le dashboard. Les performances mesurées permettent d'envisager un **contrôle à chaque
-soudure**, en environ 3 s de calcul par contrôle sur un GPU (voir
-[section 8](#8-performances-et-passage-en-production) et [docs/production.md](docs/production.md)).
-
-### Ce que le projet ne couvre pas
-
-- Le dataset ne contient **aucun log capteur**. Puissance et vitesse affichées sont les **consignes** du plan
-  d'expériences, appliquées entre l'allumage et l'extinction détectés à l'image. Toutes les autres courbes sont
-  mesurées par vision.
-- Le modèle n'a été entraîné que sur la série DoE3. Sur DoE1 et DoE2, dont l'éclairage et le cadrage diffèrent,
-  ses mesures sont moins fiables.
+L'architecture du code correspond déjà à celui d'un déploiement réel : une brique d'inférence au pied de la machine
+et une brique de restitution, le dashboard. Les performances mesurées permettent d'envisager un **contrôle à chaque
+soudure**, en environ 3 s de calcul par contrôle sur un GPU (voir [section 8](#8-performances-et-passage-en-production) 
+et [docs/production.md](docs/production.md)).
 
 **Résultats principaux**
 
@@ -109,9 +99,9 @@ make app                  # http://127.0.0.1:8050
 **B. Reconstruction complète depuis les données brutes** (machine avec GPU CUDA) :
 
 ```bash
-# 1. Télécharger les 3 fichiers de https://doi.org/10.5281/zenodo.22282527 dans data/ (noms d'origine)
+# 1. Télécharger les données source https://doi.org/10.5281/zenodo.22282527 dans data/ 
 # 2. Installer et dérouler le pipeline
-uv sync --all-groups      # app + pipeline (torch CUDA) + outils de dev
+uv sync --all-groups      # app + pipeline
 make pipeline             # environ 45 min sur RTX 3090
 make app
 ```
@@ -120,7 +110,7 @@ make app
 
 ```bash
 make docker               # nécessite app_data/, copié dans l'image
-make docker-run           # http://127.0.0.1:8050, mêmes options de durcissement qu'en production
+make docker-run           # http://127.0.0.1:8050
 ```
 
 `make help` liste toutes les cibles.
@@ -131,18 +121,18 @@ make docker-run           # http://127.0.0.1:8050, mêmes options de durcissemen
 |---|---|---|
 | Python | 3.12 (fixé par `.python-version`) | tout |
 | [uv](https://docs.astral.sh/uv/) | 0.11 ou plus | environnements et dépendances (`uv.lock`) |
-| ffmpeg et ffprobe | 6.x testé | transcodage vidéo (étapes 03 et 06), non installé par uv |
-| GPU NVIDIA + CUDA | testé sur RTX 3090 24 Go | entraînement et inférence (étapes 05 et 06) |
+| ffmpeg et ffprobe | 6.x testé | transcodage vidéo, non installé par uv |
+| GPU NVIDIA + CUDA | testé sur RTX 3090 24 Go | entraînement et inférence |
 | Docker | 24 ou plus | image de production, scan Trivy |
 
 Espace disque pour la reconstruction complète : environ **25 Go** (11,4 Go d'archives Zenodo, 12 Go une fois
 décompressées, le reste en artefacts). L'app seule n'a besoin que de `app_data/` (environ 160 Mo).
 
-Les dépendances Python sont réparties en groupes, pour ne jamais installer torch là où il ne sert pas :
+Les dépendances Python sont réparties en groupes :
 
 | Groupe | Contenu | Installé par |
 |---|---|---|
-| (principal) | Dash, Mantine, gunicorn, Pillow : le runtime de l'app | toujours, et seul dans l'image Docker |
+| (principal) | Dash, Mantine, gunicorn, Pillow : le runtime de l'app | toujours, seul dans l'image Docker |
 | `analysis` | numpy, pandas, scipy, OpenCV, pyarrow | CI, étapes du pipeline sans GPU |
 | `ml` | torch, torchvision, segmentation-models-pytorch, timm | entraînement et inférence |
 | `pipeline` | `analysis` + `ml` | `make` (cibles du pipeline) |
@@ -183,7 +173,9 @@ Non versionnés (voir `.gitignore`) : `data/` (brut et intermédiaires), `models
 
 **Source** : *High-Speed Laser Beam Welding Video Dataset with Weld, Plasma, and Spatter Annotations*,
 University of Skövde, 2026, DOI [10.5281/zenodo.22282527](https://doi.org/10.5281/zenodo.22282527), licence
-CC BY-NC 4.0. Trois fichiers à placer dans `data/` sans les renommer :
+CC BY-NC 4.0. 
+
+Trois fichiers à placer dans `data/` sans les renommer :
 
 | Fichier | Taille | Contenu |
 |---|---|---|
@@ -221,26 +213,7 @@ s'enchaînent dans l'ordre des numéros ; chacune lit les sorties des précéden
 | `09_export` | Décider le verdict de chaque soudure, calculer les limites de vigilance et exporter les fichiers légers lus par l'app | `export` | tout ce qui précède | `app_data/` (JSON, images de comparaison) |
 
 **Relancer une partie du pipeline** : après une modification, relancer l'étape modifiée et toutes les
-suivantes. Exemples courants :
-
-| Modification | À relancer |
-|---|---|
-| Seuils d'alarme, fenêtres de lissage (`07_signals.py`) | `make features export` |
-| Seuils du verdict, limites de vigilance (`09_export.py`) | `make export` |
-| Facteurs ou indicateurs du DoE (`08_doe.py`) | `make features export` |
-| Post-traitement de la segmentation (`segmodel.py`) | `make infer features export` |
-| Nouvel entraînement | `make train infer features export` |
-
-Puis `make docker` pour que l'image embarque les nouveaux artefacts.
-
-**Points d'attention**
-
-- `01_extract` et `03_transcode` sautent les fichiers déjà produits. Pour retranscoder après un changement de
-  réglage ffmpeg, supprimer d'abord `app_data/media/videos/<run>.mp4` et `posters/`.
-- `make train` **écrase** `models/unet.pt`. Sauvegarder les poids avant de réentraîner. Pour réévaluer un
-  modèle existant sans l'écraser : `cd pipeline && uv run --group pipeline python 05_train_seg.py --eval-only`.
-- Les scripts s'arrêtent sur une assertion si une incohérence est détectée (ordre d'exécution incomplet,
-  frames annotées mal alignées sur la vidéo, nombre de frames transcodées différent de la source).
+suivantes. 
 
 ## 7. Modèle de segmentation
 
@@ -258,9 +231,9 @@ Un post-traitement à l'échelle de la vidéo (`segmodel.suppress_static`) suppr
 (reflets, rayures, texture prise pour un cordon). Il fait partie intégrante du modèle : sans lui, la précision
 sur les projections tombe de 0,72 à 0,42.
 
-Les poids (`models/unet.pt`, 98 Mo) ne sont ni versionnés ni embarqués dans l'image. **En conserver une copie
-hors de la machine de développement.** Rechargement, réentraînement et ajout d'annotations :
-[docs/modele.md](docs/modele.md).
+Les poids (`models/unet.pt`, 98 Mo) ne sont ni versionnés ni embarqués dans l'image.
+
+Rechargement, réentraînement et ajout d'annotations : [docs/modele.md](docs/modele.md).
 
 ## 8. Performances et passage en production
 
@@ -270,7 +243,6 @@ Temps mesurés sur RTX 3090, pour une soudure type de 700 images (reproductibles
 |---|---|---|
 | U-Net seul | 2,3 s | 300 im/s (407 im/s en passe avant pure, lots de 32, fp16) |
 | Chaîne de mesure complète (modèle, post-traitement, mesures) | environ 3 s | |
-| Même chaîne sur CPU seul | environ 2 min | 6 im/s : un GPU est nécessaire |
 | Mémoire GPU | 3,3 Go | |
 
 Ces temps permettent d'envisager un contrôle à chaque soudure, en environ 3 s par contrôle, avec un GPU de
