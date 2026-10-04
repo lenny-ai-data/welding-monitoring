@@ -6,6 +6,7 @@ de labels de app_data/media/seg/. Le changement de frame ne sollicite jamais le 
 
 import dash_mantine_components as dmc
 from dash import ClientsideFunction, Input, Output, State, callback, clientside_callback, dcc, html
+from dash.exceptions import PreventUpdate
 
 from .. import data, theme
 from ..components import point, section_header
@@ -444,8 +445,15 @@ def area_figs(run_id: str, scheme: str | None) -> dict:
 # Callbacks : courbes côté serveur, images et curseur côté client (assets/seg.js) ------------------
 
 
-@callback(Output("seg-figs", "data"), Input("seg-run", "value"), Input("color-scheme", "computedColorScheme"))
-def load_seg(run_id, scheme):
+@callback(
+    Output("seg-figs", "data"),
+    Input("seg-run", "value"),
+    Input("color-scheme", "computedColorScheme"),
+    Input({"type": "seen", "index": "seg"}, "data"),
+)
+def load_seg(run_id, scheme, seen):
+    if not seen:
+        raise PreventUpdate  # onglet jamais ouvert : rien à calculer
     if run_id not in data.labeled_runs():
         run_id = data.labeled_runs()[0]
     return area_figs(run_id, scheme)

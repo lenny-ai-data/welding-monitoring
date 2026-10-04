@@ -190,6 +190,8 @@ def create_app() -> Dash:
                 navbar(),
                 dmc.AppShellMain(className="main", children=[sections()]),
                 dcc.Store(id="goto"),
+                # Première ouverture de chaque section : les onglets ne calculent leurs graphes qu'à ce moment.
+                *[dcc.Store(id={"type": "seen", "index": key}) for key, *_ in SECTIONS],
             ],
         ),
     )
@@ -208,6 +210,7 @@ clientside_callback(
     Output("app-shell", "navbar"),
     Output("app-shell", "className"),
     Output("nav-burger", "opened"),
+    Output({"type": "seen", "index": ALL}, "data"),
     Input({"type": "nav", "index": ALL}, "n_clicks"),
     Input("nav-burger", "opened"),
     Input("nav-collapse", "n_clicks"),

@@ -344,8 +344,8 @@ def layout() -> html.Div:
                 ],
             ),
             dcc.Store(id="live-data"),
+            dcc.Store(id="live-key"),  # clé du run chargé (sortie obligatoire du callback weld.receive)
             dcc.Store(id="video-source", data="ia"),
-            dcc.Interval(id="live-tick", interval=100),
         ],
     )
 
@@ -573,21 +573,7 @@ clientside_callback(
 )
 
 clientside_callback(
-    ClientsideFunction("weld", "tick"),
-    *[Output(f"live-{k}", "figure") for k in CHARTS],
-    Output("live-hud", "children"),
-    Output("laser-card", "className"),
-    Output("laser-text", "children"),
-    Output("laser-detail", "children"),
-    *[
-        o
-        for k in ["integrity", *(k for k, *_ in KPIS)]
-        for o in (Output(f"kpi-{k}", "children"), Output(f"kpi-{k}-sub", "children"), Output(f"ring-{k}", "style"))
-    ],
-    Output("events-log", "children"),
-    Output("events-count", "children"),
-    Output("run-select", "value"),
-    Input("live-tick", "n_intervals"),
+    ClientsideFunction("weld", "receive"),
+    Output("live-key", "data"),
     Input("live-data", "data"),
-    State("prod-mode", "checked"),
 )

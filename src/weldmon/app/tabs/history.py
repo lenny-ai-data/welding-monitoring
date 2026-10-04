@@ -7,6 +7,7 @@ serveur (quelques kilo-octets, aucun calcul lourd).
 """
 
 from dash import ALL, ClientsideFunction, Input, Output, State, callback, clientside_callback, dcc, html
+from dash.exceptions import PreventUpdate
 
 from .. import data, theme
 from ..components import VERDICTS, icon, point, section_header, verdict_badge
@@ -399,8 +400,11 @@ def trend_figure(selected: str, flt: str, scheme) -> dict:
     Input("hist-selected", "data"),
     Input("hist-filter", "data"),
     Input("color-scheme", "computedColorScheme"),
+    Input({"type": "seen", "index": "suivi"}, "data"),
 )
-def update(selected, flt, scheme):
+def update(selected, flt, scheme, seen):
+    if not seen:
+        raise PreventUpdate  # onglet jamais ouvert : rien à calculer
     run_id = data.valid_run(selected) or DEFAULT_RUN
     flt = flt if flt in ("all", *VERDICTS) else "all"
     return detail(data.runs_by_id()[run_id]), trend_figure(run_id, flt, scheme)

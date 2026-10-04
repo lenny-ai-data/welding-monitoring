@@ -1,17 +1,21 @@
 /* Monitoring process : lecteur vidéo, synchronisation vidéo <-> signaux, entièrement côté client.
  *
  * La vidéo web contient une frame par frame caméra (30 im/s) : l'index de frame procédé est
- * floor(currentTime * 30). À chaque tick (100 ms), on révèle les signaux jusqu'à cet index ;
- * si rien n'a changé (pause), on ne renvoie rien pour éviter tout rendu inutile. La timeline du
- * lecteur (progression, tête de lecture, temps) est animée à chaque image par requestAnimationFrame.
+ * floor(currentTime * 30). Une boucle autonome (100 ms) révèle les signaux jusqu'à cet index, en
+ * mettant à jour directement les courbes (Plotly) et les cartes (DOM), sans passer par Dash : Dash ne
+ * sert qu'à charger une soudure. La timeline du lecteur est animée à chaque image par requestAnimationFrame.
  */
 (function () {
   "use strict";
 
   // État, constantes et utilitaires ---------------------------------------------------------------
-  const state = { key: null, run: null, videoRun: null, idx: -1, advancing: false, resume: null, rate: 1, p: null };
-  const KPIS = ["integrity", "power", "speed"]; // même ordre que les sorties du tick (tabs/process.py)
-  const N_OUTPUTS = 4 + 1 + 3 + 3 * KPIS.length + 3;
+  const state = {
+    key: null, run: null, videoRun: null, idx: -1, chartsIdx: -1, nextCharts: 0, logKey: null,
+    advancing: false, resume: null, rate: 1, p: null,
+  };
+  const KPIS = ["integrity", "power", "speed"]; // cartes kpi-<clé> de tabs/process.py, dans l'ordre de kpis()
+  const TICK_MS = 100; // pas de la boucle de relecture
+  const CHART_SHARE = 3; // les courbes n'occupent au plus qu'un tiers du temps (cadence adaptée à la machine)
   const HOLD_MS = 3; // une alarme reste affichée 3 ms de procédé
   const nf = (v, d) =>
     v === null || v === undefined || Number.isNaN(v)
@@ -20,9 +24,11 @@
           .toLocaleString("fr-FR", { minimumFractionDigits: d, maximumFractionDigits: d })
           .replace(/\u202f/g, "\u00a0"); // espace fine absente de la police Sora
 
+  // Graphes des courbes, dans l'ordre de figures() (tabs/process.py, CHARTS).
+  const CHART_IDS = ["live-plasma", "live-speed", "live-spatter", "live-weld"];
   const el = (type, props) => ({ type, namespace: "dash_html_components", props });
   const video = () => document.getElementById("live-video");
-  const noUpdates = () => Array(N_OUTPUTS).fill(window.dash_clientside.no_update);
+  const byId = (id) => document.getElementById(id);
 
   // Couleur des anneaux ---------------------------------------------------------------------------
   // Violet, puis doré entre 60 et 100 % de la limite, rouge au-delà d'un seuil d'alarme.
@@ -266,24 +272,124 @@
     ];
   }
 
-  // Journal d'événements --------------------------------------------------------------------------
-  function eventItems(p, idx) {
+  // Écriture directe dans la page ------------------------------------------------------------------
+  // Les éléments ciblés sont créés par Dash (tabs/process.py) ; leur contenu n'est ensuite modifié que
+  // par cette boucle, jamais par un callback Dash.
+  function chartsReady() {
+    if (!window.Plotly) return null;
+    const gds = CHART_IDS.map((id) => document.querySelector("#" + id + " .js-plotly-plot"));
+    return gds.every((g) => g && g._fullLayout) ? gds : null;
+  }
+
+  function node(tag, className, text) {
+    const e = document.createElement(tag);
+    if (className) e.className = className;
+    if (text != null) e.textContent = text;
+    return e;
+  }
+
+  function setText(id, text) {
+    const e = byId(id);
+    if (e && e.textContent !== text) e.textContent = text;
+  }
+
+  function setRing(id, style) {
+    const e = byId(id);
+    if (!e) return;
+    e.style.setProperty("--p", String(style["--p"]));
+    e.style.setProperty("--c", style["--c"]);
+  }
+
+  // Journal d'événements, du plus récent au plus ancien.
+  function eventNodes(p, idx) {
     const icons = { on: "◉", off: "○", plasma_spike: "▲", spatter_burst: "◆", speed_deviation: "▼" };
     return p.events
       .filter((e) => e.start <= idx)
       .reverse()
       .slice(0, 60)
-      .map((e) =>
-        el("Li", {
-          className: "event event-" + e.type,
-          children: [
-            el("Span", { className: "event-time", children: nf(e.t_ms, 2) + " ms" }),
-            el("Span", { className: "event-icon", children: icons[e.type] || "•" }),
-            el("Span", { className: "event-label", children: e.label }),
-          ],
-        })
-      );
+      .map((e) => {
+        const li = node("li", "event event-" + e.type);
+        li.append(
+          node("span", "event-time", nf(e.t_ms, 2) + " ms"),
+          node("span", "event-icon", icons[e.type] || "•"),
+          node("span", "event-label", e.label)
+        );
+        return li;
+      });
   }
+
+  // Boucle de relecture ------------------------------------------------------------------------------
+  // Un minuteur Dash (dcc.Interval) faisait passer chaque pas par toute la mécanique de Dash sur la page :
+  // c'était l'essentiel du coût, même en pause. La boucle ne fait rien tant que l'image ne change pas.
+  // Les cartes suivent chaque pas ; les courbes, plus coûteuses, sont espacées selon leur coût mesuré :
+  // tous les pas sur une machine rapide, moins souvent sur une machine lente, qui reste ainsi réactive.
+  function render(force) {
+    const p = state.p;
+    const v = video();
+    if (!p || !v) return;
+
+    // Lecture auto : à la fin de la vidéo, on passe à la soudure suivante.
+    const prodMode = byId("prod-mode");
+    if (prodMode && prodMode.checked && v.ended && !state.advancing) {
+      state.advancing = true;
+      window.dash_clientside.set_props("run-select", { value: p.next });
+      return;
+    }
+
+    const idx = Math.max(0, Math.min(p.n - 1, Math.floor(v.currentTime * p.playback_fps + 1e-3)));
+    const moved = force || idx !== state.idx;
+    if (!moved && state.chartsIdx === idx) return;
+    const gds = chartsReady();
+    if (!gds) return; // Plotly pas encore chargé : nouvel essai au pas suivant
+
+    const now = performance.now();
+    if (force || (state.chartsIdx !== idx && now >= state.nextCharts)) {
+      const figs = figures(p, idx);
+      gds.forEach((g, i) => window.Plotly.react(g, figs[i].data, figs[i].layout));
+      const cost = performance.now() - now;
+      state.chartsIdx = idx;
+      state.nextCharts = now + Math.max(0, CHART_SHARE * cost - TICK_MS);
+    }
+    if (!moved) return;
+    state.idx = idx;
+
+    const hud = byId("live-hud");
+    if (hud) {
+      hud.replaceChildren(
+        node("span", null, "t = " + nf(p.ts.t_ms[idx], 2) + " ms"),
+        node("span", null, "image " + (idx + 1) + " / " + p.n),
+        node("span", null, "×1/" + p.slowmo)
+      );
+    }
+    const [cardClass, laserText, laserDetail] = laserAt(p, idx);
+    const card = byId("laser-card");
+    if (card && card.className !== cardClass) card.className = cardClass;
+    setText("laser-text", laserText);
+    setText("laser-detail", laserDetail);
+    kpis(p, idx, activeAlarms(p, idx)).forEach(([num, sub, ringStyle], i) => {
+      setText("kpi-" + KPIS[i], num);
+      setText("kpi-" + KPIS[i] + "-sub", sub);
+      setRing("ring-" + KPIS[i], ringStyle);
+    });
+
+    // Journal : reconstruit seulement quand un événement apparaît ou disparaît (retour en arrière).
+    const shown = p.events.filter((e) => e.start <= idx).length;
+    const logKey = state.key + "|" + shown;
+    if (force || state.logKey !== logKey) {
+      state.logKey = logKey;
+      const log = byId("events-log");
+      if (log) log.replaceChildren(...eventNodes(p, idx));
+      setText("events-count", shown + " / " + p.events.length);
+    }
+  }
+
+  window.setInterval(() => {
+    try {
+      render(false);
+    } catch (err) {
+      console.error(err);
+    }
+  }, TICK_MS);
 
   // Fonctions appelées par Dash : ClientsideFunction("weld", ...) dans tabs/process.py ------------
   window.dash_clientside = Object.assign({}, window.dash_clientside, {
@@ -323,47 +429,14 @@
         return [marks, style];
       },
 
-      tick: function (_n, p, prodMode) {
-        const v = video();
-        if (!p || !v) return noUpdates();
-        state.p = p;
-        const ctx = window.dash_clientside.callback_context;
-        // Clé stable du payload (run + thème) : évite de redessiner quand rien n'a changé.
-        const key = p.run_id + "|" + p.colors.line;
-        const newPayload = state.key !== key;
-        if (state.run !== p.run_id) state.advancing = false;
-        state.key = key;
-        state.run = p.run_id;
-
-        // Enchaîner : à la fin de la vidéo, on passe à la soudure suivante.
-        if (prodMode && v.ended && !state.advancing) {
-          state.advancing = true;
-          const out = noUpdates();
-          out[N_OUTPUTS - 1] = p.next;
-          return out;
-        }
-
-        const idx = Math.max(0, Math.min(p.n - 1, Math.floor(v.currentTime * p.playback_fps + 1e-3)));
-        const triggeredByData = ctx && ctx.triggered && ctx.triggered.some((t) => t.prop_id.startsWith("live-data"));
-        if (idx === state.idx && !newPayload && !triggeredByData) return noUpdates();
-        state.idx = idx;
-
-        const alarms = activeAlarms(p, idx);
-        const shown = p.events.filter((e) => e.start <= idx).length;
-        const hud = [
-          el("Span", { children: "t = " + nf(p.ts.t_ms[idx], 2) + " ms" }),
-          el("Span", { children: "image " + (idx + 1) + " / " + p.n }),
-          el("Span", { children: "×1/" + p.slowmo }),
-        ];
-        return [
-          ...figures(p, idx),
-          hud,
-          ...laserAt(p, idx),
-          ...kpis(p, idx, alarms).flat(),
-          eventItems(p, idx),
-          shown + " / " + p.events.length,
-          window.dash_clientside.no_update,
-        ];
+      // Réception des données d'une soudure (au chargement d'un run ou d'un thème) : rendu complet.
+      receive: function (p) {
+        if (p && state.run !== p.run_id) state.advancing = false;
+        state.p = p || null;
+        state.key = p ? p.run_id + "|" + p.colors.line : null;
+        state.run = p ? p.run_id : null;
+        window.setTimeout(() => render(true), 0); // après la mise à jour de la page par Dash
+        return state.key;
       },
     },
   });

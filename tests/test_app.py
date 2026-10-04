@@ -165,3 +165,11 @@ def test_figures_cannot_be_zoomed():
         assert layout.get("dragmode") is False
         axes = [k for k in layout if k.startswith(("xaxis", "yaxis"))]
         assert axes and all(layout[k].get("fixedrange") is True for k in axes), axes
+
+
+def test_playback_elements_are_not_dash_outputs(client):
+    """La relecture écrit directement dans ces éléments (assets/process.js) : aucun callback Dash ne doit le faire."""
+    outputs = " ".join(dep["output"] for dep in client.get("/_dash-dependencies").get_json())
+    assert "run-select.value" in outputs  # la liste lue est bien celle des sorties réelles
+    for element in ("live-hud", "laser-card", "laser-text", "kpi-speed", "ring-integrity", "events-log", "live-plasma"):
+        assert f"{element}." not in outputs, element
