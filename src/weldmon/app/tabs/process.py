@@ -188,6 +188,8 @@ def player() -> html.Div:
                         preload="auto",
                         className="video",
                     ),
+                    # Image figée pendant un changement de source (masques IA <-> vidéo brute), cf. process.js.
+                    html.Canvas(id="vp-freeze", className="vp-freeze", **{"aria-hidden": "true"}),
                     html.Div(id="live-hud", className="hud"),
                     html.Button(
                         icon("layers", 16),
