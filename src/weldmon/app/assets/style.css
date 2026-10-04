@@ -1518,9 +1518,13 @@ body {
   .hist-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 560px) {
-  .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  /* Tir laser et intégrité (textes longs) en pleine largeur, puissance et vitesse côte à côte. */
+  .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: auto; gap: 10px; }
+  .status-card,
+  .integrity-card { grid-column: 1 / -1; }
   .status-card { min-height: 0; }
   .kpi-card { flex-direction: column; align-items: flex-start; gap: 8px; padding: 12px; }
+  .integrity-card { align-items: stretch; min-height: 0; }
   .ring { width: 40px; height: 40px; }
   .hud { right: 52px; }
   .hud span:last-child { display: none; }
@@ -1528,6 +1532,8 @@ body {
   .kpi-row,
   .kpi-row-4 { grid-template-columns: minmax(0, 1fr); }
   .hist-filter { padding: 12px; gap: 10px; }
+  .hist-filter-icon { width: 34px; height: 34px; border-radius: 10px; }
+  .hist-filter-label { white-space: normal; line-height: 1.25; }
   .hist-filter-n { font-size: 22px; }
   .panel { padding: 12px; }
   .section-aside { width: 100%; }
