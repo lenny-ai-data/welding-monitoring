@@ -10,6 +10,7 @@
   const STORAGE_KEY = "weldmon-nav-collapsed";
   let current = null;
   let collapsed = null;
+  const seen = new Set(); // sections déjà ouvertes (leurs graphes sont calculés à la première ouverture)
 
   // Ancre de l'URL et préférence de repli de la barre ---------------------------------------------
   function fromHash() {
@@ -96,6 +97,11 @@
           nav,
           collapsed ? "app-shell nav-collapsed" : "app-shell",
           opened,
+          KEYS.map((k) => {
+            if (k !== current || seen.has(k)) return window.dash_clientside.no_update;
+            seen.add(k);
+            return true;
+          }),
         ];
       },
     },

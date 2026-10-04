@@ -7,6 +7,7 @@ import statistics
 
 import dash_mantine_components as dmc
 from dash import Input, Output, callback, dcc, html
+from dash.exceptions import PreventUpdate
 
 from .. import data, theme
 from ..components import point, section_header
@@ -473,8 +474,11 @@ def spc_fig(kpi_key: str, scheme) -> dict:
     Input("doe-x", "value"),
     Input("doe-y", "value"),
     Input("color-scheme", "computedColorScheme"),
+    Input({"type": "seen", "index": "analyses"}, "data"),
 )
-def update(kpi_key, fx, fy, scheme):
+def update(kpi_key, fx, fy, scheme, seen):
+    if not seen:
+        raise PreventUpdate  # onglet jamais ouvert : rien à calculer
     d = data.doe()
     if kpi_key not in d["kpis"]:
         kpi_key = next(iter(d["kpis"]))
