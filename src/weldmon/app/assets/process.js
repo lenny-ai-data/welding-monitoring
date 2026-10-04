@@ -11,7 +11,7 @@
   // État, constantes et utilitaires ---------------------------------------------------------------
   const state = {
     key: null, run: null, videoRun: null, idx: -1, chartsIdx: -1, nextCharts: 0, logKey: null,
-    advancing: false, resume: null, rate: 1, p: null,
+    advancing: false, resume: null, swap: null, rate: 1, p: null,
   };
   const KPIS = ["integrity", "power", "speed"]; // cartes kpi-<clé> de tabs/process.py, dans l'ordre de kpis()
   const TICK_MS = 100; // pas de la boucle de relecture
@@ -111,6 +111,44 @@
     }
   });
 
+  // Changement de source sans à-coup --------------------------------------------------------------
+  // Basculer les masques recharge la vidéo, qui repart de 0 le temps de se repositionner : la frame
+  // courante reste affichée (canevas vp-freeze) et le rendu est gelé jusqu'à ce que la nouvelle source
+  // montre la même image. Cartes, courbes et timeline ne bougent donc pas.
+  const SWAP_MAX_MS = 5000; // garde-fou : source qui ne charge pas
+
+  function startSwap(v) {
+    const freeze = byId("vp-freeze");
+    if (!state.swap && freeze && v.readyState >= 2 && v.videoWidth) {
+      freeze.width = v.videoWidth;
+      freeze.height = v.videoHeight;
+      freeze.getContext("2d").drawImage(v, 0, 0);
+      freeze.classList.add("is-on");
+    }
+    if (state.swap) window.clearTimeout(state.swap.timer);
+    state.swap = { seek: false, timer: window.setTimeout(endSwap, SWAP_MAX_MS) };
+  }
+
+  function endSwap() {
+    if (!state.swap) return;
+    window.clearTimeout(state.swap.timer);
+    state.swap = null;
+    const freeze = byId("vp-freeze");
+    if (freeze) freeze.classList.remove("is-on");
+  }
+
+  // Fin du changement une fois la nouvelle image affichée (et non seulement décodée).
+  function endSwapAfterFrame(v) {
+    let done = false;
+    const once = () => {
+      if (done) return;
+      done = true;
+      endSwap();
+    };
+    if (v.requestVideoFrameCallback) v.requestVideoFrameCallback(once);
+    window.setTimeout(once, 150);
+  }
+
   // Synchronisation de la vidéo -------------------------------------------------------------------
   // Reprise de la position après changement de source (vidéo brute <-> masques IA) ou de run.
   document.addEventListener(
@@ -120,19 +158,34 @@
       if (!v || v.id !== "live-video") return;
       v.playbackRate = state.rate;
       if (state.resume) {
-        if (state.resume.t > 0) v.currentTime = Math.min(state.resume.t, v.duration - 0.01);
+        if (state.resume.t > 0) {
+          if (state.swap) state.swap.seek = true;
+          v.currentTime = Math.min(state.resume.t, v.duration - 0.01);
+        }
         if (state.resume.play) v.play().catch(() => {});
         state.resume = null;
       }
     },
     true
   );
+  ["loadeddata", "seeked", "error"].forEach((type) =>
+    document.addEventListener(
+      type,
+      (e) => {
+        const v = e.target;
+        if (!v || v.id !== "live-video" || !state.swap) return;
+        if (type === "error") endSwap();
+        else if (type === "seeked" || !state.swap.seek) endSwapAfterFrame(v);
+      },
+      true
+    )
+  );
 
   // Timeline animée à chaque image (éléments sans sortie Dash : aucun conflit de rendu).
   function animate() {
     const v = video();
     const track = document.getElementById("vp-track");
-    if (v && track) {
+    if (v && track && !state.swap) {
       const f = v.duration ? v.currentTime / v.duration : 0;
       const pct = (100 * Math.min(f, 1)).toFixed(2) + "%";
       const prog = document.getElementById("vp-progress");
@@ -326,7 +379,7 @@
   function render(force) {
     const p = state.p;
     const v = video();
-    if (!p || !v) return;
+    if (!p || !v || state.swap) return; // changement de source : l'image et les cartes restent figées
 
     // Lecture auto : à la fin de la vidéo, on passe à la soudure suivante.
     const prodMode = byId("prod-mode");
@@ -395,19 +448,24 @@
   window.dash_clientside = Object.assign({}, window.dash_clientside, {
     weld: {
       videoSource: function (p, source, prodMode) {
-        if (!p) return [window.dash_clientside.no_update, window.dash_clientside.no_update];
+        const keep = [window.dash_clientside.no_update, window.dash_clientside.no_update];
+        if (!p) return keep;
         const v = video();
+        const src = "/media/videos/" + p.run_id + (source === "raw" ? "" : "_ia") + ".mp4";
+        if (v && v.getAttribute("src") === src) return keep; // même vidéo (changement de thème) : rien à recharger
         const sameRun = state.videoRun === p.run_id;
         state.videoRun = p.run_id;
         const autoplay = Boolean(window.weldAutoplay);
         window.weldAutoplay = false;
-        if (v) {
-          state.resume = sameRun
-            ? { t: v.currentTime, play: !v.paused }
-            : { t: 0, play: Boolean(prodMode) || autoplay || (v.currentTime > 0 && !v.paused) };
+        if (v && sameRun) {
+          // Pendant un changement en cours, la vidéo n'est pas encore repositionnée : reprise inchangée.
+          if (!(state.swap && state.resume)) state.resume = { t: v.currentTime, play: !v.paused };
+          startSwap(v);
+        } else if (v) {
+          endSwap();
+          state.resume = { t: 0, play: Boolean(prodMode) || autoplay || (v.currentTime > 0 && !v.paused) };
         }
-        const suffix = source === "raw" ? "" : "_ia";
-        return ["/media/videos/" + p.run_id + suffix + ".mp4", "/media/posters/" + p.run_id + ".jpg"];
+        return [src, "/media/posters/" + p.run_id + ".jpg"];
       },
 
       toggleMasks: function (_n, source) {
