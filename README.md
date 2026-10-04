@@ -23,10 +23,10 @@ Ce document est le point d'entrée pour reprendre le projet. Les détails sont d
 | Document | Contenu |
 |---|---|
 | [docs/donnees.md](docs/donnees.md) | Dictionnaire des données : chaque fichier produit, ses colonnes, ses unités, sa provenance |
-| [docs/modele.md](docs/modele.md) | Fiche du modèle de segmentation : données, entraînement, évaluation, rechargement, réentraînement |
+| [docs/modele.md](docs/modele.md) | Fiche du modèle de segmentation : données, entraînement, évaluation, rechargement, performances |
 | [docs/application.md](docs/application.md) | Architecture de l'application Dash, flux de données, contrats entre Python et JavaScript, performances du rendu |
 | [docs/production.md](docs/production.md) | Temps d'inférence, architecture de production, dimensionnement |
-| [docs/exploitation.md](docs/exploitation.md) | Image Docker, déploiement, sécurité, configuration, maintenance |
+| [docs/exploitation.md](docs/exploitation.md) | Image Docker, déploiement, sécurité, configuration |
 
 ## Sommaire
 
@@ -233,7 +233,7 @@ sur les projections tombe de 0,72 à 0,42.
 
 Les poids (`models/unet.pt`, 98 Mo) ne sont ni versionnés ni embarqués dans l'image.
 
-Rechargement, réentraînement et ajout d'annotations : [docs/modele.md](docs/modele.md).
+Rechargement du modèle et performances : [docs/modele.md](docs/modele.md).
 
 ## 8. Performances et passage en production
 
@@ -289,7 +289,7 @@ l'app (voir [Périmètre](#volet-2--dashboard-de-restitution-en-ligne)). Le serv
 des fichiers statiques. La relecture tourne dans le navigateur (une boucle JavaScript qui lit
 `video.currentTime`), sans aller-retour serveur pendant la lecture. Conséquences : charge serveur quasi nulle,
 image légère, surface d'attaque minimale. Le rendu a en outre été optimisé pour rester fluide sur un ordinateur
-modeste (mesures avant / après dans [docs/application.md](docs/application.md#9-performances-du-rendu)).
+modeste (mesures avant / après dans [docs/application.md](docs/application.md#7-performances-du-rendu)).
 
 | Onglet | Ancre | Module | Contenu |
 |---|---|---|---|
