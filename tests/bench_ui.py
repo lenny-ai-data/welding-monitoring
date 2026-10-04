@@ -1,8 +1,9 @@
 """Mesure du coût du rendu dans le navigateur : chargement, page en pause, relecture du monitoring.
 
-Protocole de docs/application.md (section Performances du rendu) : Chromium headless piloté par Playwright,
-fenêtre 1920 × 1080, processeur ralenti par les DevTools pour simuler un ordinateur modeste. L'occupation est
-la part du temps passée en tâches longues (plus de 50 ms, API Long Tasks) : c'est ce qui rend la page saccadée.
+Mesures de docs/application.md (section Performances du rendu). Protocole : Chromium headless piloté par
+Playwright, fenêtre 1920 × 1080, processeur ralenti par les DevTools pour simuler un ordinateur modeste.
+L'occupation est la part du temps passée en tâches longues (plus de 50 ms, API Long Tasks) : c'est ce qui rend
+la page saccadée.
 Ce n'est pas un test pytest (nom sans préfixe test_) : il demande une app lancée et un navigateur.
 
 Usage   : make bench-ui                                 (app sur http://127.0.0.1:8050, par make app ou make docker-run)

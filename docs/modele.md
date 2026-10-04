@@ -12,8 +12,6 @@ du projet en dépendent.
 5. [Évaluation](#5-évaluation)
 6. [Utiliser le modèle](#6-utiliser-le-modèle)
 7. [Performances](#7-performances)
-8. [Réentraîner ou enrichir](#8-réentraîner-ou-enrichir)
-9. [Limites](#9-limites)
 
 ## 1. Résumé
 
@@ -155,36 +153,3 @@ Mesuré sur RTX 3090 avec `make bench` (détail et projection vers la production
 | CPU, 12 threads, fp32 | 6 im/s | environ 2 min |
 
 Mémoire GPU de pointe : 3,3 Go. Le post-traitement (`suppress_static`) est négligeable : 0,2 s par vidéo.
-
-## 8. Réentraîner ou enrichir
-
-**Réentraîner à l'identique** : `make train infer features export`, puis `make docker`. Sauvegarder
-`models/unet.pt` avant : il est écrasé. Les métriques ressortiront très proches mais pas identiques (le calcul
-GPU n'est pas déterministe au bit près).
-
-**Ajouter des vidéos annotées** (par exemple quelques frames DoE1 / DoE2 pour réduire l'écart de domaine) :
-
-1. Déposer les annotations dans `data/interim/Labels/training_labeled/<run>_C001H001S0001/` (ou
-   `eval_ground_truth/`) au format du dataset : `frames/frame_NNNNN.png`, `final_masks/*.png` et
-   `labels_final.csv` (colonnes listées dans `04_labels.COMMON`, plus `ignore`).
-2. Ajouter le run à `TRAIN_RUNS` ou `EVAL_RUNS` dans `pipeline/common.py`.
-3. Relancer `make labels train infer features export`.
-
-Contrainte actuelle : chaque vidéo annotée doit compter **164 frames** réparties uniformément sur la vidéo. Ce
-nombre est fixé dans `04_labels.py` (`N_LABELED`), `src/weldmon/app/data.py` (`N_SEG_FRAMES`) et
-`assets/seg.js` (`N_FRAMES`). Une autre répartition demande d'adapter ces trois endroits et la reconstruction de
-la correspondance frame annotée / frame vidéo (`04_labels.frame_mapping`).
-
-**Changer d'architecture ou d'encodeur** : modifier `segmodel.build_model` (et `ENCODER`). Le reste du pipeline
-ne dépend que de la sortie `(N, 4, H, W)`.
-
-## 9. Limites
-
-- **Domaine** : entraîné sur DoE3 seulement. Sur DoE1 et DoE2, les mesures restent exploitables grâce aux
-  augmentations et au post-traitement, mais moins fiables.
-- **Volume** : environ 1 000 frames annotées, issues de 6 soudures. Les scores sur 2 vidéos d'évaluation donnent
-  un ordre de grandeur, pas un intervalle de confiance serré.
-- **Pas de reprise d'entraînement** : `05_train_seg` repart toujours des poids ImageNet. Un affinage à partir de
-  `unet.pt` demanderait une petite option dans `train()`.
-- **Traçabilité** : `metrics.json` décrit le modèle, mais aucun hash des poids ni version des données n'est
-  enregistré.

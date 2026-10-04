@@ -11,9 +11,7 @@ Architecture de l'application Dash (`src/weldmon/app/`), conventions de code et 
 4. [Onglets](#4-onglets)
 5. [Logique côté client](#5-logique-côté-client)
 6. [Contrats entre Python et JavaScript](#6-contrats-entre-python-et-javascript)
-7. [Thème et mise en page](#7-thème-et-mise-en-page)
-8. [Faire évoluer l'application](#8-faire-évoluer-lapplication)
-9. [Performances du rendu](#9-performances-du-rendu)
+7. [Performances du rendu](#7-performances-du-rendu)
 
 ## 1. Principes
 
@@ -130,55 +128,10 @@ Les couleurs de classes (cordon, plasma, projections) sont aussi définies à tr
 cohérents : `theme.TOKENS`, `segmentation.OVERLAY_COLORS` (images composées dans le navigateur) et `pipeline/06_infer.OVERLAY` (vidéos
 IA, en BGR).
 
-## 7. Thème et mise en page
-
-- **Couleurs** : un violet unique (`#8C18CC`) et ses nuances pour l'interface et les courbes de procédé. Le doré
-  signale la vigilance, le rouge l'alarme ; un statut n'est jamais porté par la couleur seule (toujours une icône
-  et un libellé). Les classes de segmentation gardent leurs couleurs propres dans tous les graphiques et vidéos.
-- **Deux sources de couleurs** : les variables CSS de `style.css` (interface) et `theme.TOKENS` (figures Plotly,
-  qui ne lisent pas le CSS). Une modification de palette se fait aux deux endroits.
-- **Plein écran** : chaque page tient sans défilement en 1920 × 1080. Les proportions sont pilotées par la
-  largeur (contenu plafonné à 1648 px) ; en fenêtre plus petite, la page garde ses proportions et défile. Si une
-  mise à l'échelle devenait nécessaire, utiliser `transform` et non la propriété CSS `zoom`, qui casse le survol
-  des graphiques Plotly.
-
-## 8. Faire évoluer l'application
-
-**Lancer en local** : `make app` (port 8050, variable `PORT`). L'app cherche ses données dans `app_data/` à la
-racine du dépôt, ou dans le dossier indiqué par `WELDMON_DATA`.
-
-**Ajouter un onglet**
-
-1. Créer `tabs/<nom>.py` avec une fonction `layout()` qui commence par `components.section_header(...)`.
-2. L'ajouter à `SECTIONS` dans `__init__.py` (clé, libellé, icône Lucide, constructeur).
-3. Ajouter la clé à `KEYS` dans `nav.js`, à la même position.
-4. Si l'icône est nouvelle : déposer le SVG Lucide dans `assets/icons/` et déclarer la classe `.icon-<nom>` dans
-   `style.css`.
-5. Ajouter un test de rendu dans `tests/test_app.py`.
-
-**Ajouter un indicateur à un onglet** : le calculer dans le pipeline (`07_signals.py` pour un signal ou un KPI),
-l'exporter (`09_export.py`), puis le lire via `data.py`. Ne jamais ajouter de calcul numpy / pandas dans l'app.
-
-**Ajouter une route ou un média** : passer par `security.py`, avec une expression régulière ou une liste blanche
-stricte, et un test de rejet des chemins invalides.
-
-**Tests** : `make test`. Les tests de `tests/test_app.py` vérifient les en-têtes de sécurité, les routes, la
-liste blanche et le rendu de chaque onglet ; ils sont sautés si `app_data/` est absent.
-
-## 9. Performances du rendu
+## 7. Performances du rendu
 
 Le serveur ne calcule presque rien : ce qui compte pour la fluidité, c'est le travail du **navigateur**. Deux
-séries d'optimisations ont été menées, mesurées avant et après selon le même protocole.
-
-### Protocole de mesure
-
-- Chromium headless piloté par Playwright, fenêtre 1920 × 1080, app servie par l'image Docker (gunicorn).
-- Deux processeurs : celui de la machine de développement, puis le même **ralenti 4 fois** par les DevTools, pour
-  simuler un ordinateur portable modeste, celui d'un client en rendez-vous par exemple.
-- Indicateur : la part du temps passée en **tâches longues** (plus de 50 ms, API Long Tasks du navigateur). C'est
-  ce qui produit les saccades et les clics sans réponse. On relève aussi le plus long gel.
-- Commande : `make bench-ui` (app lancée au préalable, adresse réglable par `URL=...`). Le script est
-  `tests/bench_ui.py` ; il demande une fois `uvx playwright install chromium`.
+séries d'optimisations ont été menées, mesurées avant et après dans les mêmes conditions.
 
 ### Lecture de l'onglet Segmentation (v0.5.3)
 
@@ -204,8 +157,7 @@ qui attend que la frame courante soit dessinée et préchargement des 6 suivante
 
 **Diagnostic** (profil CPU pendant la relecture, processeur ralenti) : 44 % du temps dans le moteur de Dash, 20 %
 dans le dessin Plotly. Un minuteur Dash (`dcc.Interval`) déclenchait toutes les 100 ms un callback qui faisait
-transiter les quatre figures complètes par Dash. Expérience décisive : **même un callback vide** saturait un
-processeur ralenti, vidéo en pause comprise. Le coût venait du passage par Dash lui-même, sur une page de
+transiter les quatre figures complètes par Dash. Le coût venait du passage par Dash lui-même, sur une page de
 plusieurs centaines de composants. Appelé directement, `Plotly.react` ne coûte qu'environ 5 ms par graphe.
 
 **Corrections** :
@@ -222,13 +174,3 @@ plusieurs centaines de composants. Appelé directement, `Plotly.react` ne coûte
 | Vidéo en pause | ralenti 4 fois | occupé 61 % | **0 %** |
 | Calcul au chargement | normal | 3,6 s | **0,7 s** |
 | Calcul au chargement | ralenti 4 fois | 12,6 s | **7,8 s** |
-
-### Pistes non retenues à ce jour
-
-| Piste | Gain attendu | Pourquoi pas encore |
-|---|---|---|
-| Version partielle de plotly.js (« cartesian », qui couvre courbes, barres et contours) | script de 4,8 Mo ramené à environ 1,3 Mo ; le plus long gel restant (0,5 s, 1,9 s sur processeur ralenti) vient de l'analyse de ce script au chargement | il faut vérifier que Dash accepte une version personnalisée de Plotly ; gain surtout sensible sur mobile |
-| Cache long de plotly.min.js (une ligne dans le Caddyfile) | un aller-retour de moins par visite : ce script est le seul servi sans durée de cache | gain modeste |
-| Préchargement de la vidéo suivante en « Lecture auto » | enchaînement des soudures sans blanc | confort de démonstration, sans effet sur la fluidité |
-| Bascule clair / sombre sans serveur | quelques allers-retours de moins | bascule rare, gain faible |
-
