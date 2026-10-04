@@ -24,7 +24,7 @@ Ce document est le point d'entrée pour reprendre le projet. Les détails sont d
 |---|---|
 | [docs/donnees.md](docs/donnees.md) | Dictionnaire des données : chaque fichier produit, ses colonnes, ses unités, sa provenance |
 | [docs/modele.md](docs/modele.md) | Fiche du modèle de segmentation : données, entraînement, évaluation, rechargement, réentraînement |
-| [docs/application.md](docs/application.md) | Architecture de l'application Dash, flux de données, contrats entre Python et JavaScript |
+| [docs/application.md](docs/application.md) | Architecture de l'application Dash, flux de données, contrats entre Python et JavaScript, performances du rendu |
 | [docs/production.md](docs/production.md) | Temps d'inférence, architecture de production, dimensionnement |
 | [docs/exploitation.md](docs/exploitation.md) | Image Docker, déploiement, sécurité, configuration, maintenance |
 
@@ -288,7 +288,8 @@ Principe : **tout est précalculé**. L'inférence du modèle a lieu dans le pip
 l'app (voir [Périmètre](#volet-2--dashboard-de-restitution-en-ligne)). Le serveur ne sert que la mise en page et
 des fichiers statiques. La relecture tourne dans le navigateur (une boucle JavaScript qui lit
 `video.currentTime`), sans aller-retour serveur pendant la lecture. Conséquences : charge serveur quasi nulle,
-image légère, surface d'attaque minimale.
+image légère, surface d'attaque minimale. Le rendu a en outre été optimisé pour rester fluide sur un ordinateur
+modeste (mesures avant / après dans [docs/application.md](docs/application.md#9-performances-du-rendu)).
 
 | Onglet | Ancre | Module | Contenu |
 |---|---|---|---|

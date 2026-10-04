@@ -13,6 +13,7 @@ Architecture de l'application Dash (`src/weldmon/app/`), conventions de code et 
 6. [Contrats entre Python et JavaScript](#6-contrats-entre-python-et-javascript)
 7. [Thème et mise en page](#7-thème-et-mise-en-page)
 8. [Faire évoluer l'application](#8-faire-évoluer-lapplication)
+9. [Performances du rendu](#9-performances-du-rendu)
 
 ## 1. Principes
 
@@ -163,3 +164,71 @@ stricte, et un test de rejet des chemins invalides.
 
 **Tests** : `make test`. Les tests de `tests/test_app.py` vérifient les en-têtes de sécurité, les routes, la
 liste blanche et le rendu de chaque onglet ; ils sont sautés si `app_data/` est absent.
+
+## 9. Performances du rendu
+
+Le serveur ne calcule presque rien : ce qui compte pour la fluidité, c'est le travail du **navigateur**. Deux
+séries d'optimisations ont été menées, mesurées avant et après selon le même protocole.
+
+### Protocole de mesure
+
+- Chromium headless piloté par Playwright, fenêtre 1920 × 1080, app servie par l'image Docker (gunicorn).
+- Deux processeurs : celui de la machine de développement, puis le même **ralenti 4 fois** par les DevTools, pour
+  simuler un ordinateur portable modeste, celui d'un client en rendez-vous par exemple.
+- Indicateur : la part du temps passée en **tâches longues** (plus de 50 ms, API Long Tasks du navigateur). C'est
+  ce qui produit les saccades et les clics sans réponse. On relève aussi le plus long gel.
+- Commande : `make bench-ui` (app lancée au préalable, adresse réglable par `URL=...`). Le script est
+  `tests/bench_ui.py` ; il demande une fois `uvx playwright install chromium`.
+
+### Lecture de l'onglet Segmentation (v0.5.3)
+
+**Symptôme** : en ligne, les images ne défilaient pas pendant la lecture ; seule la pause les faisait apparaître.
+En local, aucun problème.
+
+**Cause** : chaque image était composée par le serveur (frame et masques peints par Pillow, route `/overlay`). En
+ligne, une image arrivait en environ 180 ms, alors que la lecture passait à la frame suivante toutes les 120 ms
+en demandant deux nouvelles images. Le navigateur abandonnait chaque chargement avant la fin pour lancer le
+suivant : rien ne s'affichait jamais, et le serveur composait en pure perte les images abandonnées.
+
+**Correction** : composition dans le navigateur à partir des fichiers statiques de `app_data/media/seg/`, lecture
+qui attend que la frame courante soit dessinée et préchargement des 6 suivantes (voir la section 4).
+
+| | Avant | Après |
+|---|---|---|
+| Calcul serveur par image | environ 70 ms sur une petite instance Render (4 ms en local) | aucun |
+| Données par frame | environ 96 Ko (deux JPEG) | environ 36 Ko (frame et deux cartes), mises en cache |
+| Lecture avec 200 ms de latence réseau | gelée | 6,6 frames/s (8,3 au plus), image toujours synchrone avec le curseur |
+| Fidélité des images | référence | écart moyen inférieur à 2 niveaux sur 255 avec l'ancienne composition |
+
+### Monitoring et chargement de la page (v0.5.4)
+
+**Diagnostic** (profil CPU pendant la relecture, processeur ralenti) : 44 % du temps dans le moteur de Dash, 20 %
+dans le dessin Plotly. Un minuteur Dash (`dcc.Interval`) déclenchait toutes les 100 ms un callback qui faisait
+transiter les quatre figures complètes par Dash. Expérience décisive : **même un callback vide** saturait un
+processeur ralenti, vidéo en pause comprise. Le coût venait du passage par Dash lui-même, sur une page de
+plusieurs centaines de composants. Appelé directement, `Plotly.react` ne coûte qu'environ 5 ms par graphe.
+
+**Corrections** :
+
+1. Relecture sortie de la boucle Dash : une boucle JavaScript autonome met à jour directement les courbes et les
+   cartes, avec une cadence des courbes adaptée au coût mesuré (section 4).
+2. Graphes des onglets Suivi, Analyses et Segmentation calculés à leur première ouverture, et non au chargement
+   de la page (section 3).
+
+| Mesure | Processeur | v0.5.3 | v0.5.4 |
+|---|---|---|---|
+| Relecture | normal | occupé 83 % | **pratiquement 0 %** (aucune tâche longue) |
+| Relecture | ralenti 4 fois | occupé 93 %, gels jusqu'à 458 ms | **occupé 39 %, gels de moins de 90 ms** |
+| Vidéo en pause | ralenti 4 fois | occupé 61 % | **0 %** |
+| Calcul au chargement | normal | 3,6 s | **0,7 s** |
+| Calcul au chargement | ralenti 4 fois | 12,6 s | **7,8 s** |
+
+### Pistes non retenues à ce jour
+
+| Piste | Gain attendu | Pourquoi pas encore |
+|---|---|---|
+| Version partielle de plotly.js (« cartesian », qui couvre courbes, barres et contours) | script de 4,8 Mo ramené à environ 1,3 Mo ; le plus long gel restant (0,5 s, 1,9 s sur processeur ralenti) vient de l'analyse de ce script au chargement | il faut vérifier que Dash accepte une version personnalisée de Plotly ; gain surtout sensible sur mobile |
+| Cache long de plotly.min.js (une ligne dans le Caddyfile) | un aller-retour de moins par visite : ce script est le seul servi sans durée de cache | gain modeste |
+| Préchargement de la vidéo suivante en « Lecture auto » | enchaînement des soudures sans blanc | confort de démonstration, sans effet sur la fluidité |
+| Bascule clair / sombre sans serveur | quelques allers-retours de moins | bascule rare, gain faible |
+
