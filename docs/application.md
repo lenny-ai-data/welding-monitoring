@@ -51,6 +51,9 @@ Dash charge automatiquement tout le contenu de `assets/` (CSS et JS) dans l'ordr
 2. **Rendu** : les 5 sections sont construites une seule fois et toutes présentes dans le DOM ; une seule est
    visible. Changer d'onglet ne fait que basculer leur `display` (callback `nav.route`), ce qui rend la
    navigation instantanée et conserve l'état de chaque onglet.
+   **Les graphes d'un onglet ne sont calculés qu'à sa première ouverture** : `nav.route` renseigne alors le store
+   `{"type": "seen", "index": <section>}`, entrée des callbacks serveur des onglets Suivi, Analyses et
+   Segmentation, qui ne font rien tant qu'il est vide. Le premier affichage ne paie que le monitoring.
 3. **Navigation** : l'ancre de l'URL (`#process`, `#suivi`...) détermine la section affichée ; un lien direct
    ouvre donc la bonne page. Le store `goto` permet à un onglet d'en ouvrir un autre (« Ouvrir dans Monitoring
    process » depuis le suivi).
@@ -61,7 +64,7 @@ Dash charge automatiquement tout le contenu de `assets/` (CSS et JS) dans l'ordr
 
 | Onglet | Module | Callbacks serveur | Callbacks client |
 |---|---|---|---|
-| Monitoring process | `tabs/process.py` | `load_run` : charge le run choisi dans le store `live-data` (séries, événements, limites, mises en page des courbes) | `weld.videoSource`, `weld.toggleMasks`, `weld.marks`, `weld.tick` |
+| Monitoring process | `tabs/process.py` | `load_run` : charge le run choisi dans le store `live-data` (séries, événements, limites, mises en page des courbes) | `weld.videoSource`, `weld.toggleMasks`, `weld.marks`, `weld.receive` ; relecture par une boucle JavaScript hors Dash |
 | Suivi & historique | `tabs/history.py` | `update` : détail de la soudure sélectionnée et courbe des alarmes | `history.select`, `history.filter`, `history.open` |
 | Analyses | `tabs/doe.py` | `update` : surface de réponse, effets, effets principaux, carte I-MR | aucun |
 | Segmentation IA | `tabs/segmentation.py` | `load_seg` : courbes d'aires et d'IoU de la vidéo choisie | `seg.render`, `seg.togglePlay`, `seg.advance` |
@@ -72,12 +75,21 @@ Dash charge automatiquement tout le contenu de `assets/` (CSS et JS) dans l'ordr
 - `load_run` envoie tout ce qu'il faut pour rejouer la soudure : `live_payload()` assemble les séries de
   `ts/<run>.json`, les événements avec leurs libellés, les limites (seuil de plasma, vigilance vitesse,
   instabilité, bornes du verdict) et les mises en page des 4 courbes (`chart_layouts()`).
-- `weld.tick` est appelé toutes les 100 ms (`dcc.Interval` `live-tick`). Il lit la position de la vidéo, en
-  déduit l'index de frame (`floor(currentTime * 30)`) et révèle les courbes, les cartes, l'anneau d'intégrité et
-  le journal jusqu'à cet index. Si rien n'a changé (pause), il ne renvoie rien.
+- `weld.receive` garde ces données côté navigateur. Une **boucle JavaScript autonome** (`render`, toutes les
+  100 ms) lit la position de la vidéo, en déduit l'index de frame (`floor(currentTime * 30)`) et révèle jusqu'à
+  cet index les courbes (appel direct à `Plotly.react`), les cartes, l'anneau d'intégrité et le journal (écriture
+  directe dans les éléments créés par Dash). Si l'image n'a pas changé (pause), elle ne fait rien.
+- **Pourquoi hors de Dash** : avec un minuteur `dcc.Interval`, chaque pas faisait passer toute la mécanique de
+  Dash sur la page, ce qui saturait un ordinateur modeste même en pause. Les éléments mis à jour par la boucle
+  (`live-hud`, `laser-card`, `kpi-*`, `ring-*`, `events-log`, courbes `live-*`) ne doivent donc être la sortie
+  d'aucun callback Dash.
+- **Cadence adaptative** : la boucle mesure le coût du dessin des courbes et les espace pour qu'elles occupent au
+  plus un tiers du temps (`CHART_SHARE`). Sur une machine rapide, elles suivent chaque pas ; sur une machine
+  lente, elles avancent par pas plus grands et la page reste réactive.
 - La timeline du lecteur (progression, tête de lecture) est animée à chaque image par `requestAnimationFrame`,
   hors callback Dash.
-- « Lecture auto » (`prod-mode`) enchaîne les soudures dans l'ordre réel de production (`data.next_run`).
+- « Lecture auto » (`prod-mode`) enchaîne les soudures dans l'ordre réel de production (`data.next_run`) : en fin
+  de vidéo, la boucle change la soudure choisie par `dash_clientside.set_props("run-select", ...)`.
 
 **Segmentation IA.** Les images comparées (annotation, prédiction ou désaccords) sont composées **dans le
 navigateur** par `assets/seg.js`, à partir de fichiers statiques : la frame (`frames/NNN.webp`) et les deux cartes
@@ -108,7 +120,7 @@ erreur explicite.
 | Python | JavaScript | Objet |
 |---|---|---|
 | `SECTIONS`, `DEFAULT_SECTION`, `NAV_WIDTH` (`__init__.py`) | `KEYS`, `DEFAULT`, `WIDTH` (`nav.js`) | clés et ordre des sections, largeur de la barre |
-| sorties de `weld.tick` (`tabs/process.py`) | `KPIS`, `N_OUTPUTS` (`process.js`) | nombre et ordre des sorties du tick |
+| `KPIS`, `CHARTS` et identifiants des cartes et courbes (`tabs/process.py`) | `KPIS`, `CHART_IDS` (`process.js`) | éléments mis à jour par la boucle de relecture |
 | `FILTERS` (`tabs/history.py`) | `VERDICTS` (`history.js`) | ordre des filtres |
 | `N_SEG_FRAMES` (`data.py`) | `N_FRAMES` (`seg.js`) | 164 frames par vidéo annotée |
 | noms de fichiers de `app_data/media/` | URL construites dans `process.js` et `seg.js` | à garder conformes à `MEDIA_RE` (`security.py`) |

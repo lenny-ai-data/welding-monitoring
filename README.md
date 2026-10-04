@@ -286,7 +286,7 @@ peuvent légèrement bouger, et avec eux le verdict des soudures proches d'une l
 
 Principe : **tout est précalculé**. L'inférence du modèle a lieu dans le pipeline (étape `06_infer`), pas dans
 l'app (voir [Périmètre](#volet-2--dashboard-de-restitution-en-ligne)). Le serveur ne sert que la mise en page et
-des fichiers statiques. La relecture tourne dans le navigateur (callbacks clientside qui lisent
+des fichiers statiques. La relecture tourne dans le navigateur (une boucle JavaScript qui lit
 `video.currentTime`), sans aller-retour serveur pendant la lecture. Conséquences : charge serveur quasi nulle,
 image légère, surface d'attaque minimale.
 
