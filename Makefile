@@ -8,8 +8,10 @@ TAG ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 # Architectures de l'image publiée : serveurs x86 et ARM (Ampere, Graviton...). L'ARM se construit sous
 # émulation QEMU sur une machine x86 (paquet qemu-user-static).
 PLATFORMS ?= linux/amd64,linux/arm64
+# Adresse de l'app mesurée par bench-ui (lancée par make app ou make docker-run).
+URL ?= http://127.0.0.1:8050
 
-.PHONY: help data labels train infer features export pipeline bench app test lint docker docker-multi docker-run push scan
+.PHONY: help data labels train infer features export pipeline bench app bench-ui test lint docker docker-multi docker-run push scan
 
 # Aide ---------------------------------------------------------------------------------------------
 help:  ## Affiche cette aide
@@ -42,6 +44,9 @@ bench:  ## Mesure des temps d'inférence sur une vidéo (GPU)
 # Développement ------------------------------------------------------------------------------------
 app:  ## Lance l'app en local (http://127.0.0.1:8050)
 	uv run python -m weldmon.app.main
+
+bench-ui:  ## Mesure du rendu dans le navigateur (app lancée sur URL ; Chromium de Playwright requis)
+	uv run --with playwright python tests/bench_ui.py $(URL)
 
 test:  ## Tests unitaires
 	uv run --group analysis pytest -q
